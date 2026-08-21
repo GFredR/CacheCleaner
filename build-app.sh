@@ -29,6 +29,15 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
 cp "$BUILD_DIR/$APP_NAME" "$CONTENTS/MacOS/"
 
+# 把语言资源（zh-Hans.lproj / en.lproj）从 SPM bundle 复制进 .app bundle
+# SPM 把 resources 规范化放在 .build/release/<Module>_<Target>.bundle/，目录名小写
+SPM_BUNDLE="$BUILD_DIR/${APP_NAME}_${APP_NAME}.bundle"
+for LOC in zh-hans en; do
+    if [ -d "$SPM_BUNDLE/$LOC.lproj" ]; then
+        cp -R "$SPM_BUNDLE/$LOC.lproj" "$CONTENTS/Resources/"
+    fi
+done
+
 # 生成多尺寸 PNG + .icns
 ICONSET="$CONTENTS/Resources/AppIcon.iconset"
 mkdir -p "$ICONSET"

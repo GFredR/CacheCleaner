@@ -51,6 +51,6 @@ struct CacheItem: Identifiable, Hashable {
     }
 
     var sizeString: String {
-        ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+        SizeFormatter.string(from: size)
     }
 }

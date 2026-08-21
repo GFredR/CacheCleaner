@@ -18,7 +18,7 @@ struct DirectoryNode: Identifiable {
     var level: ImportanceLevel? { file?.level }
 
     var sizeString: String {
-        ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+        SizeFormatter.string(from: size)
     }
 }
 

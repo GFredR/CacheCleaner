@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// 设置窗口：通用（含外观字体/主题）+ 白名单
 struct SettingsView: View {
@@ -88,8 +89,19 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
 
             HStack {
-                TextField("输入要保留的缓存路径，如 ~/Library/Caches/WeChat", text: $newWhitelistPath)
+                TextField("输入或点浏览选择要保留的缓存路径", text: $newWhitelistPath)
                     .textFieldStyle(.roundedBorder)
+                Button("浏览…") {
+                    let panel = NSOpenPanel()
+                    panel.canChooseFiles = false
+                    panel.canChooseDirectories = true
+                    panel.allowsMultipleSelection = false
+                    panel.prompt = "选择"
+                    panel.message = "选择要加入白名单的文件夹（其下缓存清理时将被跳过）"
+                    if panel.runModal() == .OK, let url = panel.url {
+                        newWhitelistPath = url.path
+                    }
+                }
                 Button("添加") {
                     let path = newWhitelistPath
                         .trimmingCharacters(in: .whitespacesAndNewlines)

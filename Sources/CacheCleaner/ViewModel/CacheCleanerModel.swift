@@ -60,10 +60,10 @@ final class CacheCleanerModel: ObservableObject {
     var selectedCount: Int { selectedIDs.count }
 
     var totalSizeString: String {
-        ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
+        SizeFormatter.string(from: totalSize)
     }
     var selectedSizeString: String {
-        ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)
+        SizeFormatter.string(from: selectedSize)
     }
     /// 选中项中「将被跳过」的数量（运行中或白名单，且 skipRunningApps 开启时）
     var selectedSkippedCount: Int {
@@ -243,7 +243,7 @@ final class CacheCleanerModel: ObservableObject {
                 self.selectedIDs.removeAll()
                 self.isCleaning = false
 
-                let freed = ByteCountFormatter.string(fromByteCount: result.freedBytes, countStyle: .file)
+                let freed = SizeFormatter.string(from: result.freedBytes)
                 self.cleanReport = CleanReport(
                     freedString: freed,
                     failedCount: result.failedPaths.count,

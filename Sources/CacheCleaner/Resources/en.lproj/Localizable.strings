@@ -1,0 +1,114 @@
+/*  Tab names  */
+"缓存清理" = "Cache Cleanup";
+"目录分析" = "Directory Analysis";
+"通用" = "General";
+"白名单" = "Whitelist";
+
+/*  Settings · General  */
+"外观" = "Appearance";
+"列表字体大小" = "List Font Size";
+"应用于缓存列表与目录分析列表的文字。" = "Applied to text in both cache list and directory analysis list.";
+"主题" = "Theme";
+"跟随系统" = "Follow System";
+"浅色" = "Light";
+"深色" = "Dark";
+"浅色 / 深色 / 跟随系统，切换即时生效。" = "Light / Dark / Follow System, switches instantly.";
+"跳过正在运行的 App 的缓存" = "Skip caches of running apps";
+"避免清理正在使用中的应用，防止出现异常或数据丢失。" = "Avoid cleaning caches of running apps to prevent glitches or data loss.";
+"清理时移入废纸篓（可恢复）" = "Move to Trash (recoverable)";
+"移入废纸篓后可从废纸篓恢复，但清理速度明显变慢；关闭则直接删除。" = "Files moved to Trash can be recovered, but cleanup is noticeably slower; off deletes directly.";
+"重新检测「完全磁盘访问权限」" = "Recheck \"Full Disk Access\"";
+"检测中…" = "Checking…";
+"重新检测" = "Recheck";
+
+/*  Settings · Whitelist  */
+"白名单中的缓存路径在清理时会被强制跳过（前缀匹配）。" = "Whitelisted cache paths are forcibly skipped during cleanup (prefix match).";
+"输入或点浏览选择要保留的缓存路径" = "Type or click Browse to choose a path to keep";
+"浏览…" = "Browse…";
+"选择" = "Choose";
+"选择要加入白名单的文件夹（其下缓存清理时将被跳过）" = "Choose a folder to whitelist (its caches will be skipped during cleanup)";
+"添加" = "Add";
+"暂无白名单" = "No whitelist yet";
+"从白名单移除" = "Remove from whitelist";
+
+/*  Cache cleanup page  */
+"已发现 %lld 项缓存 · 共 %@" = "Found %lld cache items · Total %@";
+"完全磁盘访问权限状态" = "Full Disk Access status";
+"已授权" = "Authorized";
+"未授权" = "Not Authorized";
+"勾选安全项" = "Select Safe";
+"勾选所有非运行中、非白名单的缓存" = "Select all non-running, non-whitelisted caches";
+"设置（字体大小、白名单等）" = "Settings (font size, whitelist…)";
+"开始扫描" = "Start Scan";
+"重新扫描" = "Rescan";
+"扫描中…" = "Scanning…";
+"正在统计 %@" = "Counting %@";
+"还没有扫描结果" = "No scan results yet";
+"点击右上角「开始扫描」查找电脑里的缓存" = "Click \"Start Scan\" in top-right to find caches";
+"需要「完全磁盘访问权限」才能扫到所有 App 的缓存。开启后扫描结果才完整。" = "Full Disk Access required to scan all apps' caches. Authorize for complete results.";
+"打开系统设置" = "Open System Settings";
+"已选 %lld 项 · 可释放 %@" = "%lld selected · Free %@";
+"将移入废纸篓" = "Will move to Trash";
+"勾选安全项（非运行中/非白名单）" = "Select Safe (non-running, non-whitelisted)";
+"全选所有项（含运行中）" = "Select All (including running)";
+"批量勾选：安全项 / 全部" = "Bulk select: safe / all";
+"清除选择" = "Clear Selection";
+"清理所选" = "Clean Selected";
+
+/*  Directory analysis page  */
+"重新选择要分析的目录" = "Choose another directory to analyze";
+"更换目录" = "Change Directory";
+"或点击选择目录…" = "Or click to choose a directory…";
+"App 会扫描其中的所有文件，按重要性标记颜色：\n🟢 可清理（缓存/临时/日志） · 🟡 谨慎（压缩包/未知） · 🔴 重要勿删（文档/代码/数据库）" = "App scans all files and tags by importance:\n🟢 Cleanable (cache/temp/log) · 🟡 Cautious (archives/unknown) · 🔴 Important, do not delete (docs/code/db)";
+
+"拖拽或点击" = "Drop or click";
+"该目录下没有文件" = "No files in this directory";
+"准备中…" = "Preparing…";
+"正在扫描…" = "Scanning…";
+"正在计算文件总数…" = "Counting files…";
+"已处理 %lld / %lld 个文件" = "Processed %lld / %lld files";
+"已选 %lld 个可清理文件 · 可释放 %@" = "%lld cleanable files selected · Free %@";
+"全选可清理项" = "Select All Cleanable";
+"清理可清理项" = "Clean Cleanable";
+"%lld 个 · %@" = "%lld · %@";
+"%lld 个文件" = "%lld files";
+
+/*  Row views  */
+"运行中" = "Running";
+"勾选/取消" = "Toggle selection";
+"勾选 %@" = "Select %@";
+"取消勾选 %@" = "Deselect %@";
+"在访达中查看" = "Show in Finder";
+"复制路径" = "Copy Path";
+"打开" = "Open";
+
+/*  Cache category labels  */
+"系统" = "System";
+"应用" = "Application";
+"沙盒" = "Sandbox";
+"开发" = "Developer";
+
+/*  Alerts  */
+"确认清理" = "Confirm Cleanup";
+"清理" = "Clean";
+"清理完成" = "Cleanup Complete";
+"好" = "OK";
+"需要完全磁盘访问权限" = "Full Disk Access Required";
+"未授权完全磁盘访问权限时，沙盒容器的缓存扫不到。\n建议先授予权限再扫描，以获得全部 App 的缓存。" = "Without Full Disk Access, sandboxed app caches won't be detected.\nAuthorize first for complete results.";
+"继续扫描（结果可能不完整）" = "Continue (results may be incomplete)";
+"将把 %lld 项缓存移入废纸篓，预计释放 %@。\n可在废纸篓中恢复，正在使用的 App 可能需要重启。" = "Will move %lld cache items to Trash, freeing about %@.\nRecoverable from Trash; running apps may need restart.";
+"将删除 %lld 项缓存，预计释放 %@。\n此操作不可撤销，正在使用的 App 可能需要重启。" = "Will delete %lld cache items, freeing about %@.\nCannot be undone; running apps may need restart.";
+"其中 %lld 项（运行中/白名单）将被跳过，实际清理 %lld 项。" = "%lld items (running/whitelisted) will be skipped; actually cleaning %lld items.";
+"将删除 %lld 个可清理文件，预计释放 %@。\n重要（红色）和谨慎（黄色）的文件不会被删除。" = "Will delete %lld cleanable files, freeing about %@.\nImportant (red) and cautious (yellow) files will NOT be deleted.";
+"取消" = "Cancel";
+"完成" = "Done";
+"设置" = "Settings";
+"打开字体大小、白名单、主题等设置" = "Open font size, whitelist, theme and other settings";
+"批量勾选：安全项 / 全部" = "Bulk select: safe / all";
+"请拖入一个文件夹目录" = "Please drop a folder directory";
+
+/*  CacheItem category raw values (kept for compatibility)  */
+"缓存分类·系统" = "System";
+"缓存分类·应用" = "Application";
+"缓存分类·沙盒" = "Sandbox";
+"缓存分类·开发" = "Developer";

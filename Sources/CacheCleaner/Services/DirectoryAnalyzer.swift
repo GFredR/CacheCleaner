@@ -10,7 +10,7 @@ struct AnalyzedFile: Identifiable, Hashable {
     let level: ImportanceLevel
 
     var sizeString: String {
-        ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+        SizeFormatter.string(from: size)
     }
 }
 
@@ -19,15 +19,17 @@ final class DirectoryAnalyzer {
 
     /// 快速预扫描：仅枚举路径，不读大小，用于进度条总量预估。
     /// 大目录通常几百毫秒完成（远快于正式扫描）。
-    func countFiles(at url: URL) async -> Int {
+    func countFiles(at url: URL, onProgress: ((Int, Int) -> Void)? = nil) async -> Int {
         await Task.detached(priority: .userInitiated) {
-            Self.countFilesSync(at: url)
+            Self.countFilesSync(at: url, onProgress: onProgress)
         }.value
     }
 
-    /// 同步枚举统计文件数（枚举迭代在非并发闭包上下文，兼容 Swift 6 严格并发）
-    private static func countFilesSync(at url: URL) -> Int {
+    /// 同步枚举统计文件数
+    /// onProgress: 周期性回调（processed, estimatedTotal），用于显示准备阶段进度
+    private static func countFilesSync(at url: URL, onProgress: ((Int, Int) -> Void)?) -> Int {
         var count = 0
+        var dirs = 0
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(
             at: url,
@@ -36,12 +38,21 @@ final class DirectoryAnalyzer {
         ) else {
             return 0
         }
+        // 估算顶层目录数作为进度分母（不可靠但够用）
+        let totalEstimate = (try? fm.contentsOfDirectory(atPath: url.path).count) ?? 0
+        var lastCb = 0
         for case let fileURL as URL in enumerator {
             if Task.isCancelled { break }
             let v = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             if v?.isSymbolicLink == true { continue }
-            if v?.isRegularFile == true { count += 1 }
+            if v?.isRegularFile == true { count += 1 } else { dirs += 1 }
+            // 每扫 200 项回调一次（避免频繁更新 UI）
+            if let cb = onProgress, (count + dirs) - lastCb >= 200 {
+                lastCb = count + dirs
+                cb(count + dirs, max(totalEstimate * 100, 1))  // *100：估算偏小，放大避免马上 100%
+            }
         }
+        onProgress?(count + dirs, count + dirs)
         return count
     }
 

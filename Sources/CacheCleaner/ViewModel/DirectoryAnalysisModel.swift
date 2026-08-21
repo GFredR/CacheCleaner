@@ -18,6 +18,11 @@ final class DirectoryAnalysisModel: ObservableObject {
     @Published var totalFiles = 0
     /// 当前正在处理的文件路径（正式扫描阶段）
     @Published var currentPath = ""
+    /// 预扫描阶段进度（0..1）
+    @Published var countProgress: Double = 0
+    /// 当前扫描阶段（"准备中" / "扫描中"）用于 UI 文案
+    @Published var scanPhase: ScanPhase = .preparing
+    enum ScanPhase { case preparing, scanning }
     @Published var cleanReport: String?
     @Published var errorMessage: String?
 
@@ -58,10 +63,10 @@ final class DirectoryAnalysisModel: ObservableObject {
     var selectedCount: Int { selectedIDs.count }
 
     var totalSizeString: String {
-        ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
+        SizeFormatter.string(from: totalSize)
     }
     var selectedSizeString: String {
-        ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)
+        SizeFormatter.string(from: selectedSize)
     }
 
     // MARK: - 扫描
@@ -91,15 +96,24 @@ final class DirectoryAnalysisModel: ObservableObject {
         isScanning = true
         processedCount = 0
         totalFiles = 0
+        countProgress = 0
+        scanPhase = .preparing
 
         scanTask = Task { [weak self] in
             guard let self else { return }
 
-            // Step 1: 快速预扫描拿总文件数（只枚举路径，几百毫秒）
-            let total = await self.analyzer.countFiles(at: url)
+            // Step 1: 快速预扫描拿总文件数（带进度回调）
+            let total = await self.analyzer.countFiles(at: url) { processed, estimated in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.countProgress = min(Double(processed) / Double(max(estimated, 1)), 1.0)
+                }
+            }
             if Task.isCancelled { return }
             await MainActor.run {
                 self.totalFiles = total
+                self.countProgress = 1.0
+                self.scanPhase = .scanning
             }
 
             // Step 2: 正式扫描（读大小 + 分类），带真实进度
@@ -193,7 +207,7 @@ final class DirectoryAnalysisModel: ObservableObject {
                 self.selectedIDs.removeAll()
                 self.isCleaning = false
 
-                let freedString = ByteCountFormatter.string(fromByteCount: result.freed, countStyle: .file)
+                let freedString = SizeFormatter.string(from: result.freed)
                 self.cleanReport = result.failed.isEmpty
                     ? "成功释放 \(freedString)"
                     : "成功释放 \(freedString)，\(result.failed.count) 个文件删除失败（可能正在使用）"

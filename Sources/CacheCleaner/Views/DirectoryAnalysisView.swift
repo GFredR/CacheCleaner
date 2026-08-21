@@ -227,8 +227,16 @@ struct DirectoryAnalysisView: View {
                 .progressViewStyle(.linear)
                 .frame(maxWidth: 420)
             } else {
-                ProgressView()
-                    .controlSize(.large)
+                // 预扫描阶段：显示进度条 + 百分比
+                ProgressView(value: model.countProgress) {
+                    EmptyView()
+                } currentValueLabel: {
+                    Text(countPercentText)
+                        .font(.system(size: fontSize - 1).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                .progressViewStyle(.linear)
+                .frame(maxWidth: 420)
             }
 
             // 已处理数 / 当前路径
@@ -254,13 +262,18 @@ struct DirectoryAnalysisView: View {
 
     /// 扫描阶段标题
     private var scanTitleText: String {
-        model.totalFiles == 0 ? "准备中…" : "正在扫描…"
+        model.scanPhase == .preparing ? "准备中…" : "正在扫描…"
     }
 
     /// 已处理 / 总数
     private var scanProgressDetailText: String {
         guard model.totalFiles > 0 else { return "正在计算文件总数…" }
         return "已处理 \(model.processedCount) / \(model.totalFiles) 个文件"
+    }
+
+    /// 预扫描阶段百分比
+    private var countPercentText: String {
+        String(format: "%.0f%%", model.countProgress * 100)
     }
 
     /// 百分比
@@ -322,7 +335,7 @@ struct DirectoryAnalysisView: View {
     }
 
     private func byteString(_ bytes: Int64) -> String {
-        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        SizeFormatter.string(from: bytes)
     }
 
     private var errorPresented: Binding<Bool> {
