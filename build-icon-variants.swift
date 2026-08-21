@@ -46,12 +46,17 @@ func drawStar(_ s: CGFloat, _ center: NSPoint, _ color: NSColor) {
     draw(symbol("star.fill", pointSize: s, color: color), centeredAt: center, size: s)
 }
 
-// 渐变背景 + 顶部径向光晕
+// 渐变背景 + 顶部径向光晕（圆角矩形，圆角外透明；Apple 圆角比例 22.37%）
 func drawBackground(top: NSColor, bottom: NSColor) {
     let rect = NSRect(x: 0, y: 0, width: size, height: size)
+    let corner = size * 0.2237   // Apple squircle 圆角比例
+    let path = NSBezierPath(roundedRect: rect, xRadius: corner, yRadius: corner)
     let g = NSGradient(colors: [top, bottom])!
-    g.draw(in: rect, angle: -90)
-    // 顶部中央径向光晕（模拟光照，Apple 风格）
+    g.draw(in: path, angle: -90)
+
+    // 顶部中央径向光晕（模拟光照，Apple 风格），裁剪到圆角内
+    NSGraphicsContext.current?.saveGraphicsState()
+    path.addClip()
     let glowCenter = NSPoint(x: size / 2, y: size * 0.92)
     let glowRadius: CGFloat = 520
     let glow = NSGradient(colorsAndLocations:
@@ -65,6 +70,7 @@ func drawBackground(top: NSColor, bottom: NSColor) {
         )),
         relativeCenterPosition: NSPoint(x: 0, y: 0)
     )
+    NSGraphicsContext.current?.restoreGraphicsState()
 }
 
 let amber = NSColor(calibratedRed: 1.0, green: 0.84, blue: 0.25, alpha: 1)       // #FFD640
