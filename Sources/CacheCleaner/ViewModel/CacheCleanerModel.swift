@@ -65,6 +65,11 @@ final class CacheCleanerModel: ObservableObject {
     var selectedSizeString: String {
         ByteCountFormatter.string(fromByteCount: selectedSize, countStyle: .file)
     }
+    /// 选中项中「将被跳过」的数量（运行中或白名单，且 skipRunningApps 开启时）
+    var selectedSkippedCount: Int {
+        guard skipRunningApps else { return 0 }
+        return items.filter { selectedIDs.contains($0.id) && ($0.isRunning || $0.isWhitelisted) }.count
+    }
 
     // MARK: - 权限
 
@@ -84,8 +89,9 @@ final class CacheCleanerModel: ObservableObject {
             let granted = await Task.detached(priority: .userInitiated) {
                 PermissionService.hasFullDiskAccess()
             }.value
-            await MainActor.run {
-                self?.permissionState = granted ? .granted : .denied
+            let state: PermissionState = granted ? .granted : .denied
+            await MainActor.run { [weak self] in
+                self?.permissionState = state
                 self?.isCheckingPermission = false
             }
         }

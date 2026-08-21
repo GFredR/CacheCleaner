@@ -25,12 +25,14 @@ if [ ! -f "$BG_PNG" ]; then
     swift build-dmg-background.swift "$BG_PNG" "$APP_ICON"
 fi
 
-# 3. 准备 staging 目录（.app + Applications 别名）
+# 3. 准备 staging 目录（.app + Applications 别名 + 背景图）
 echo "→ 准备 staging 目录"
 rm -rf "$DMG_STAGING"
-mkdir -p "$DMG_STAGING"
+mkdir -p "$DMG_STAGING/.background"
 cp -R "$APP_DIR" "$DMG_STAGING/"
 ln -s /Applications "$DMG_STAGING/Applications"
+# 背景图提前放入 staging（attach 失败时 dmg 里也带背景图，Finder 仍会显示）
+cp "$BG_PNG" "$DMG_STAGING/.background/background.png"
 
 # 4. 生成临时 dmg 并设置 Finder 窗口布局
 echo "→ 生成临时 dmg 设置布局"
@@ -47,11 +49,8 @@ if [ -n "$DEVICE" ]; then
     MOUNT_POINT=$(mount | grep "$DEVICE " | awk '{print $3}')
     if [ -n "$MOUNT_POINT" ]; then
         echo "→ 设置 Finder 窗口布局"
-        # 把背景图复制到 dmg 卷根目录（.background 是约定的隐藏目录）
-        mkdir -p "$MOUNT_POINT/.background"
-        cp "$BG_PNG" "$MOUNT_POINT/.background/background.png"
-
-        # AppleScript：设置窗口背景 + 图标位置 + 图标视图
+        # 背景图已随 staging 进入卷内（.background 是 Finder 约定的隐藏目录），
+        # 这里只负责用 AppleScript 设置窗口位置与视图样式
         osascript <<EOF || true
         tell application "Finder"
             tell disk "$APP_NAME"

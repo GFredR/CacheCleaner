@@ -44,9 +44,7 @@ struct CacheCleanerView: View {
             Button("取消", role: .cancel) {}
             Button("清理", role: .destructive) { model.cleanSelected() }
         } message: {
-            Text(model.useTrash
-                 ? "将把 \(model.selectedCount) 项缓存移入废纸篓，预计释放 \(model.selectedSizeString)。\n可在废纸篓中恢复，正在使用的 App 可能需要重启。"
-                 : "将删除 \(model.selectedCount) 项缓存，预计释放 \(model.selectedSizeString)。\n此操作不可撤销，正在使用的 App 可能需要重启。")
+            Text(confirmMessage)
         }
         .alert("清理完成", isPresented: reportPresented) {
             Button("好", role: .cancel) {}
@@ -110,6 +108,21 @@ struct CacheCleanerView: View {
     private var scanButtonTitle: String {
         if model.isScanning { return "扫描中…" }
         return model.items.isEmpty ? "开始扫描" : "重新扫描"
+    }
+
+    /// 清理确认文案：按废纸篓模式 + 跳过项数动态生成
+    private var confirmMessage: String {
+        let base: String
+        if model.useTrash {
+            base = "将把 \(model.selectedCount) 项缓存移入废纸篓，预计释放 \(model.selectedSizeString)。\n可在废纸篓中恢复，正在使用的 App 可能需要重启。"
+        } else {
+            base = "将删除 \(model.selectedCount) 项缓存，预计释放 \(model.selectedSizeString)。\n此操作不可撤销，正在使用的 App 可能需要重启。"
+        }
+        let skipped = model.selectedSkippedCount
+        if skipped > 0 {
+            return base + "\n其中 \(skipped) 项（运行中/白名单）将被跳过，实际清理 \(model.selectedCount - skipped) 项。"
+        }
+        return base
     }
 
     /// 未授权时弹窗引导授权，已授权直接开始

@@ -21,23 +21,28 @@ final class DirectoryAnalyzer {
     /// 大目录通常几百毫秒完成（远快于正式扫描）。
     func countFiles(at url: URL) async -> Int {
         await Task.detached(priority: .userInitiated) {
-            var count = 0
-            let fm = FileManager.default
-            guard let enumerator = fm.enumerator(
-                at: url,
-                includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
-                options: [.skipsPackageDescendants]
-            ) else {
-                return 0
-            }
-            for case let fileURL as URL in enumerator {
-                if Task.isCancelled { break }
-                let v = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-                if v?.isSymbolicLink == true { continue }
-                if v?.isRegularFile == true { count += 1 }
-            }
-            return count
+            Self.countFilesSync(at: url)
         }.value
+    }
+
+    /// 同步枚举统计文件数（枚举迭代在非并发闭包上下文，兼容 Swift 6 严格并发）
+    private static func countFilesSync(at url: URL) -> Int {
+        var count = 0
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+            options: [.skipsPackageDescendants]
+        ) else {
+            return 0
+        }
+        for case let fileURL as URL in enumerator {
+            if Task.isCancelled { break }
+            let v = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            if v?.isSymbolicLink == true { continue }
+            if v?.isRegularFile == true { count += 1 }
+        }
+        return count
     }
 
     /// 分析指定目录
@@ -51,6 +56,16 @@ final class DirectoryAnalyzer {
         totalCount: Int,
         onProgress: @escaping (Int, Int, String) -> Void
     ) async -> [AnalyzedFile] {
+        // 枚举在同步私有函数中执行（避免 Swift 6 async 上下文的 makeIterator 限制）
+        scanFiles(url: url, totalCount: totalCount, onProgress: onProgress)
+    }
+
+    /// 同步枚举扫描（供 analyze 调用；枚举器迭代在非 async 上下文，兼容 Swift 6 严格并发）
+    private func scanFiles(
+        url: URL,
+        totalCount: Int,
+        onProgress: @escaping (Int, Int, String) -> Void
+    ) -> [AnalyzedFile] {
         let fm = FileManager.default
         var files: [AnalyzedFile] = []
         var processed = 0

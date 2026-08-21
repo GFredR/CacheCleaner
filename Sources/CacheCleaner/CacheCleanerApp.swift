@@ -12,7 +12,8 @@ struct CacheCleanerApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        // 单窗口：所有窗口共享同一个 model，多窗口会互相覆盖状态，故用 Window（禁用 Cmd+N）
+        Window("CacheCleaner", id: "main") {
             ContentView()
                 .environmentObject(model)
                 .frame(minWidth: 780, minHeight: 540)
