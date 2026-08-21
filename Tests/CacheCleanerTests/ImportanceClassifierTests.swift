@@ -7,17 +7,29 @@ final class ImportanceClassifierTests: XCTestCase {
         ImportanceClassifier.classify(url: URL(fileURLWithPath: path))
     }
 
-    // MARK: - 规则 0a：路径含可清理目录段 → 绿
+    // 规则 0a 里普通缓存/产物内容仍算可清理
     func testSafePathSegmentCaches() {
         XCTAssertEqual(classify("/Users/x/Library/Caches/com.tencent.x/foo.log"), .safeToClean)
-        XCTAssertEqual(classify("/Users/x/tmp/scratch"), .safeToClean)
-        XCTAssertEqual(classify("/Users/x/Projects/A/node_modules/react/index.js"), .safeToClean)
+        XCTAssertEqual(classify("/Users/x/Library/Caches/com.tencent.x/widget.o"), .safeToClean)
+        XCTAssertEqual(classify("/Users/x/Projects/A/node_modules/react/dist/bundle.o"), .safeToClean)
         XCTAssertEqual(classify("/Users/x/Library/Developer/Xcode/DerivedData/A/Build/Products/x"), .safeToClean)
     }
 
-    // 规则 0a 优先级高于扩展名：Caches 下的 .swift 也算可清理
-    func testCachesOverridesImportantExtension() {
-        XCTAssertEqual(classify("/Users/x/Library/Caches/foo.swift"), .safeToClean)
+    // 危险场景防护：任意业务目录里名为 tmp/cache 子文件夹下的"重要类型"文件，
+    // 即便路径命中可清理目录段，也不得标绿（否则会被默认勾选删除）。
+    func testSafePathSegmentDoesNotDowngradeImportantExtension() {
+        XCTAssertEqual(classify("/Users/x/Projects/A/tmp/合同.docx"), .cautious)
+        XCTAssertEqual(classify("/Users/x/个人资料/cache/相册备份.pdf"), .cautious)
+        XCTAssertEqual(classify("/Users/x/Projects/B/Logs/notes.md"), .cautious)
+        XCTAssertEqual(classify("/Users/x/Projects/C/dist/config.json"), .cautious)
+        XCTAssertEqual(classify("/Users/x/Projects/D/node_modules/data.sqlite"), .cautious)
+    }
+
+    // 关键文件名的 .env / .gitignore / README 即使位于可清理目录段下也不降级为绿
+    func testSafePathSegmentDoesNotDowngradeImportantFileName() {
+        XCTAssertEqual(classify("/Users/x/project/cache/.env"), .cautious)
+        XCTAssertEqual(classify("/Users/x/project/tmp/.gitignore"), .cautious)
+        XCTAssertEqual(classify("/Users/x/project/target/README.md"), .cautious)
     }
 
     // MARK: - 规则 0b：.git 目录 → 红

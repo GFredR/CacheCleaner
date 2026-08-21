@@ -35,6 +35,11 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            Toggle("系统缓存清理时强制移入废纸篓", isOn: $model.forceTrashForSystem)
+            Text("开启后 com.apple.* 等系统缓存一律进废纸篓，即使上方「移入废纸篓」关闭，防止误删。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             Divider()
 
             Section("外观") {

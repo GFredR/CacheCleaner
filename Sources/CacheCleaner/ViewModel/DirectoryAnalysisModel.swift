@@ -27,6 +27,7 @@ final class DirectoryAnalysisModel: ObservableObject {
     @Published var errorMessage: String?
 
     private var scanTask: Task<Void, Never>?
+    private var scanFlag: CancellationFlag?
     private let analyzer = DirectoryAnalyzer()
 
     // MARK: - 统计
@@ -34,8 +35,10 @@ final class DirectoryAnalysisModel: ObservableObject {
     /// 每个重要性等级的文件数与总大小（一次性缓存，避免每次 body 刷新 O(3n) filter）
     private(set) var levelCounts: [ImportanceLevel: Int] = [:]
     private(set) var levelSizes: [ImportanceLevel: Int64] = [:]
-
-    var totalSize: Int64 { files.reduce(0) { $0 + $1.size } }
+    /// 总大小缓存，扫描/清理后更新，避免每个 View 刷新都 O(n) reduce
+    private(set) var totalSize: Int64 = 0
+    /// 选中大小增量维护，避免每次渲染 O(n) 过滤求和
+    private var _selectedSize: Int64 = 0
 
     func count(of level: ImportanceLevel) -> Int {
         levelCounts[level] ?? 0
@@ -45,21 +48,22 @@ final class DirectoryAnalysisModel: ObservableObject {
         levelSizes[level] ?? 0
     }
 
-    /// 全列表一次性统计红黄绿数量与大小（扫描完成/清理后调用）
+    /// 全列表一次性统计大小与红黄绿数量（扫描完成/清理后调用）
     private func recomputeStats() {
         var counts: [ImportanceLevel: Int] = [:]
         var sizes: [ImportanceLevel: Int64] = [:]
+        var sum: Int64 = 0
         for f in files {
             counts[f.level, default: 0] += 1
             sizes[f.level, default: 0] += f.size
+            sum += f.size
         }
         levelCounts = counts
         levelSizes = sizes
+        totalSize = sum
     }
 
-    var selectedSize: Int64 {
-        files.filter { selectedIDs.contains($0.id) }.reduce(0) { $0 + $1.size }
-    }
+    var selectedSize: Int64 { _selectedSize }
     var selectedCount: Int { selectedIDs.count }
 
     var totalSizeString: String {
@@ -83,11 +87,14 @@ final class DirectoryAnalysisModel: ObservableObject {
         }
 
         scanTask?.cancel()
+        scanFlag?.cancel()
         files = []
         tree = []
         levelCounts = [:]
         levelSizes = [:]
+        totalSize = 0
         selectedIDs = []
+        _selectedSize = 0
         cleanReport = nil
         errorMessage = nil
 
@@ -99,17 +106,22 @@ final class DirectoryAnalysisModel: ObservableObject {
         countProgress = 0
         scanPhase = .preparing
 
+        let flag = CancellationFlag()
+        self.scanFlag = flag
+
         scanTask = Task { [weak self] in
             guard let self else { return }
 
             // Step 1: 快速预扫描拿总文件数（带进度回调）
-            let total = await self.analyzer.countFiles(at: url) { processed, estimated in
+            let total = await self.analyzer.countFiles(at: url,
+                isCancelled: { flag.isCancelled }
+            ) { processed, estimated in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     self.countProgress = min(Double(processed) / Double(max(estimated, 1)), 1.0)
                 }
             }
-            if Task.isCancelled { return }
+            if Task.isCancelled || flag.isCancelled { return }
             await MainActor.run {
                 self.totalFiles = total
                 self.countProgress = 1.0
@@ -117,7 +129,9 @@ final class DirectoryAnalysisModel: ObservableObject {
             }
 
             // Step 2: 正式扫描（读大小 + 分类），带真实进度
-            let result = await self.analyzer.analyze(url: url, totalCount: total) { processed, total, path in
+            let result = await self.analyzer.analyze(url: url, totalCount: total,
+                isCancelled: { flag.isCancelled }
+            ) { processed, total, path in
                 Task { @MainActor [weak self] in
                     self?.processedCount = processed
                     self?.totalFiles = total
@@ -126,7 +140,7 @@ final class DirectoryAnalysisModel: ObservableObject {
             }
 
             await MainActor.run {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled && !flag.isCancelled else { return }
                 // 按重要性倒序（红在前）、同等级按大小降序
                 self.files = result.sorted {
                     if $0.level.order != $1.level.order {
@@ -137,9 +151,9 @@ final class DirectoryAnalysisModel: ObservableObject {
                 self.tree = DirectoryTreeBuilder.build(from: self.files, rootURL: url)
                 self.recomputeStats()
                 // 默认勾选所有可安全清理项
-                self.selectedIDs = Set(
-                    self.files.filter { $0.level == .safeToClean }.map { $0.id }
-                )
+                let safe = self.files.filter { $0.level == .safeToClean }
+                self.selectedIDs = Set(safe.map { $0.id })
+                self._selectedSize = safe.reduce(0) { $0 + $1.size }
                 self.isScanning = false
                 self.currentPath = ""
             }
@@ -148,6 +162,7 @@ final class DirectoryAnalysisModel: ObservableObject {
 
     func cancelScan() {
         scanTask?.cancel()
+        scanFlag?.cancel()
         isScanning = false
     }
 
@@ -158,13 +173,17 @@ final class DirectoryAnalysisModel: ObservableObject {
         guard file.level == .safeToClean else { return }
         if selectedIDs.contains(file.id) {
             selectedIDs.remove(file.id)
+            _selectedSize -= file.size
         } else {
             selectedIDs.insert(file.id)
+            _selectedSize += file.size
         }
     }
 
     func selectAllCleanable() {
-        selectedIDs = Set(files.filter { $0.level == .safeToClean }.map { $0.id })
+        let all = files.filter { $0.level == .safeToClean }
+        selectedIDs = Set(all.map { $0.id })
+        _selectedSize = all.reduce(0) { $0 + $1.size }
     }
 
     // MARK: - 清理
@@ -173,7 +192,14 @@ final class DirectoryAnalysisModel: ObservableObject {
         let targets = files.filter { selectedIDs.contains($0.id) && $0.level == .safeToClean }
         guard !targets.isEmpty else { return }
 
+        // 与缓存清理页共用同一套白名单保护：命中白名单的文件即使标绿也跳过
+        let whitelisted = WhitelistStore.paths()
+        let candidates = targets.filter { !CacheCleanerService.isWhitelisted($0.url, whitelist: Set(whitelisted)) }
+        let skippedCount = targets.count - candidates.count
+        guard !candidates.isEmpty else { return }
+
         isCleaning = true
+        let skipped = skippedCount
         let rootURL = self.rootURL
 
         Task { [weak self] in
@@ -183,7 +209,7 @@ final class DirectoryAnalysisModel: ObservableObject {
                 let fm = FileManager.default
                 var freed: Int64 = 0
                 var failed: [String] = []
-                for file in targets {
+                for file in candidates {
                     do {
                         if useTrash {
                             try fm.trashItem(at: file.url, resultingItemURL: nil)
@@ -200,17 +226,22 @@ final class DirectoryAnalysisModel: ObservableObject {
 
             await MainActor.run {
                 // 只移除成功删除的；失败项保留（可能是正在使用/无权限）
-                let cleanedIDs = Set(targets.filter { !result.failed.contains($0.url.path) }.map { $0.id })
+                let cleanedIDs = Set(candidates.filter { !result.failed.contains($0.url.path) }.map { $0.id })
                 self.files = self.files.filter { !cleanedIDs.contains($0.id) }
                 self.tree = DirectoryTreeBuilder.build(from: self.files, rootURL: rootURL ?? URL(fileURLWithPath: "/"))
                 self.recomputeStats()
                 self.selectedIDs.removeAll()
+                self._selectedSize = 0
                 self.isCleaning = false
 
                 let freedString = SizeFormatter.string(from: result.freed)
-                self.cleanReport = result.failed.isEmpty
+                var report = result.failed.isEmpty
                     ? "成功释放 \(freedString)"
                     : "成功释放 \(freedString)，\(result.failed.count) 个文件删除失败（可能正在使用）"
+                if skipped > 0 {
+                    report += "；\(skipped) 个文件命中白名单已跳过"
+                }
+                self.cleanReport = report
             }
         }
     }

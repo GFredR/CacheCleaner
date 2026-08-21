@@ -19,15 +19,24 @@ final class DirectoryAnalyzer {
 
     /// 快速预扫描：仅枚举路径，不读大小，用于进度条总量预估。
     /// 大目录通常几百毫秒完成（远快于正式扫描）。
-    func countFiles(at url: URL, onProgress: ((Int, Int) -> Void)? = nil) async -> Int {
+    /// - Parameter isCancelled: 后台取消检查；detached 任务不继承父级取消，需显式传入。
+    func countFiles(
+        at url: URL,
+        isCancelled: @escaping () -> Bool = { false },
+        onProgress: ((Int, Int) -> Void)? = nil
+    ) async -> Int {
         await Task.detached(priority: .userInitiated) {
-            Self.countFilesSync(at: url, onProgress: onProgress)
+            Self.countFilesSync(at: url, onProgress: onProgress, isCancelled: isCancelled)
         }.value
     }
 
     /// 同步枚举统计文件数
     /// onProgress: 周期性回调（processed, estimatedTotal），用于显示准备阶段进度
-    private static func countFilesSync(at url: URL, onProgress: ((Int, Int) -> Void)?) -> Int {
+    private static func countFilesSync(
+        at url: URL,
+        onProgress: ((Int, Int) -> Void)?,
+        isCancelled: @escaping () -> Bool
+    ) -> Int {
         var count = 0
         var dirs = 0
         let fm = FileManager.default
@@ -42,7 +51,7 @@ final class DirectoryAnalyzer {
         let totalEstimate = (try? fm.contentsOfDirectory(atPath: url.path).count) ?? 0
         var lastCb = 0
         for case let fileURL as URL in enumerator {
-            if Task.isCancelled { break }
+            if isCancelled() { break }
             let v = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             if v?.isSymbolicLink == true { continue }
             if v?.isRegularFile == true { count += 1 } else { dirs += 1 }
@@ -65,17 +74,19 @@ final class DirectoryAnalyzer {
     func analyze(
         url: URL,
         totalCount: Int,
+        isCancelled: @escaping () -> Bool = { false },
         onProgress: @escaping (Int, Int, String) -> Void
     ) async -> [AnalyzedFile] {
         // 枚举在同步私有函数中执行（避免 Swift 6 async 上下文的 makeIterator 限制）
-        scanFiles(url: url, totalCount: totalCount, onProgress: onProgress)
+        scanFiles(url: url, totalCount: totalCount, onProgress: onProgress, isCancelled: isCancelled)
     }
 
     /// 同步枚举扫描（供 analyze 调用；枚举器迭代在非 async 上下文，兼容 Swift 6 严格并发）
     private func scanFiles(
         url: URL,
         totalCount: Int,
-        onProgress: @escaping (Int, Int, String) -> Void
+        onProgress: @escaping (Int, Int, String) -> Void,
+        isCancelled: @escaping () -> Bool
     ) -> [AnalyzedFile] {
         let fm = FileManager.default
         var files: [AnalyzedFile] = []
@@ -90,7 +101,7 @@ final class DirectoryAnalyzer {
         }
 
         while let fileURL = enumerator.nextObject() as? URL {
-            if Task.isCancelled { break }
+            if isCancelled() { break }
 
             let values = try? fileURL.resourceValues(
                 forKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey]

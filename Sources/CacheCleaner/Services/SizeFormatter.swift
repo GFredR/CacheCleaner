@@ -1,8 +1,8 @@
 import Foundation
 
 /// 统一的字节大小格式化（避免 ByteCountFormatter 在某些 locale 下输出"Zero KB"）
-/// 单位固定 KB/MB/GB/TB，数字小数位按值自适应：≥100 不带小数，≥10 保留 1 位，否则 2 位。
-/// 0 字节也显示"0 KB"（与"0 KB"预期一致）。
+/// 小于 1KB 直接按字节显示（如 512 B）；≥1KB 用固定单位 KB/MB/GB/TB，
+/// 数字小数位按值自适应：≥100 不带小数，≥10 保留 1 位，否则 2 位。
 enum SizeFormatter {
 
     private static let units = ["KB", "MB", "GB", "TB"]
@@ -10,7 +10,7 @@ enum SizeFormatter {
     static func string(from bytes: Int64) -> String {
         let value = Double(bytes)
         if value < 1024 {
-            return "0 KB"
+            return "\(bytes) B"   // 小于 1KB 直接显示字节，避免丢失小文件体积信息
         }
         var v = value / 1024
         var idx = 0

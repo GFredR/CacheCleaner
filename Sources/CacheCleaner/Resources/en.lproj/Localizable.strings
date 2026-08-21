@@ -17,6 +17,8 @@
 "避免清理正在使用中的应用，防止出现异常或数据丢失。" = "Avoid cleaning caches of running apps to prevent glitches or data loss.";
 "清理时移入废纸篓（可恢复）" = "Move to Trash (recoverable)";
 "移入废纸篓后可从废纸篓恢复，但清理速度明显变慢；关闭则直接删除。" = "Files moved to Trash can be recovered, but cleanup is noticeably slower; off deletes directly.";
+"系统缓存清理时强制移入废纸篓" = "Force system caches to Trash";
+"开启后 com.apple.* 等系统缓存一律进废纸篓，即使上方「移入废纸篓」关闭，防止误删。" = "When on, system caches (com.apple.*) always go to Trash even if \"Move to Trash\" above is off, to prevent accidental deletion.";
 "重新检测「完全磁盘访问权限」" = "Recheck \"Full Disk Access\"";
 "检测中…" = "Checking…";
 "重新检测" = "Recheck";
@@ -24,6 +26,7 @@
 /*  Settings · Whitelist  */
 "白名单中的缓存路径在清理时会被强制跳过（前缀匹配）。" = "Whitelisted cache paths are forcibly skipped during cleanup (prefix match).";
 "输入或点浏览选择要保留的缓存路径" = "Type a path and click Add, or click Browse… to choose folder(s)";
+"输入路径后点添加，或点浏览…选择文件夹" = "Type a path and press Enter/Add, or Browse… to choose folder(s)";
 "浏览…" = "Browse…";
 "选择" = "Choose";
 "选择要加入白名单的文件夹（其下缓存清理时将被跳过）" = "Choose one or more folders; their caches will be skipped during cleanup";

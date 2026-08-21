@@ -5,6 +5,75 @@ final class CacheCleanerServiceTests: XCTestCase {
 
     private let wl: Set<String> = ["/Users/x/Library/Caches/WeChat"]
 
+    // MARK: - clean：真实删除流程
+
+    private func makeCacheDir() -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cc-clean-test-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    private func fakeItem(url: URL) -> CacheItem {
+        CacheItem(url: url, name: "test", category: .application, bundleID: "com.test.app", size: 0)
+    }
+
+    func testCleanDeletesContentsKeepsDir() throws {
+        let dir = makeCacheDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try Data(repeating: 0, count: 100).write(to: dir.appendingPathComponent("a.bin"))
+        try Data(repeating: 0, count: 200).write(to: dir.appendingPathComponent("b.bin"))
+
+        let result = CacheCleanerService.clean(
+            items: [fakeItem(url: dir)],
+            toTrash: false,
+            skipRunning: false,
+            whitelist: [],
+            forceTrashForSystem: false,
+            isCancelled: { false }
+        )
+
+        XCTAssertEqual(result.failedPaths, [])
+        XCTAssertEqual(result.skippedPaths, [])
+        XCTAssertEqual(result.freedBytes, 300, "应释放 300 字节")
+        // 内容已删，但目录本身保留（App 可重建）
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dir.path))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: dir.path).count, 0)
+    }
+
+    func testCleanSkipsWhitelistedPath() throws {
+        let dir = makeCacheDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try Data(repeating: 0, count: 50).write(to: dir.appendingPathComponent("c.bin"))
+
+        let result = CacheCleanerService.clean(
+            items: [fakeItem(url: dir)],
+            toTrash: false,
+            skipRunning: false,
+            whitelist: [dir.path],
+            forceTrashForSystem: false,
+            isCancelled: { false }
+        )
+
+        XCTAssertEqual(result.skippedPaths, [dir.path], "命中白名单应被跳过")
+        XCTAssertEqual(result.freedBytes, 0)
+        // 内容必须原样保留
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dir.appendingPathComponent("c.bin").path))
+    }
+
+    func testCleanReportsNonexistentAsFailed() {
+        let missing = URL(fileURLWithPath: "/tmp/cc-does-not-exist-\(UUID().uuidString)")
+        let result = CacheCleanerService.clean(
+            items: [fakeItem(url: missing)],
+            toTrash: false,
+            skipRunning: false,
+            whitelist: [],
+            forceTrashForSystem: false,
+            isCancelled: { false }
+        )
+        XCTAssertEqual(result.failedPaths, [missing.path], "不存在的目录应计入失败")
+    }
+
     // MARK: - 白名单目录边界匹配
 
     func testWhitelistMatchesExactPath() {

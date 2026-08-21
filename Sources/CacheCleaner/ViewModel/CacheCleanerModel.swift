@@ -23,6 +23,10 @@ final class CacheCleanerModel: ObservableObject {
     @Published var useTrash: Bool {
         didSet { UserDefaults.standard.set(useTrash, forKey: "useTrash") }
     }
+    /// 系统缓存（com.apple.*）清理时强制移入废纸篓，防止不可恢复误删
+    @Published var forceTrashForSystem: Bool {
+        didSet { UserDefaults.standard.set(forceTrashForSystem, forKey: "forceTrashForSystem") }
+    }
 
     enum PermissionState {
         case unknown, granted, denied
@@ -48,16 +52,22 @@ final class CacheCleanerModel: ObservableObject {
 
     private let scanner = CacheScanner()
     private var scanTask: Task<Void, Never>?
-
-    private static let whitelistKey = "whitelist"
+    private var scanFlag: CancellationFlag?
 
     // MARK: - 统计
 
-    var totalSize: Int64 { items.reduce(0) { $0 + $1.size } }
-    var selectedSize: Int64 {
-        items.filter { selectedIDs.contains($0.id) }.reduce(0) { $0 + $1.size }
-    }
+    /// 已缓存的总大小，扫描完成后更新，避免每个 View 刷新都做一次 O(n) reduce
+    private(set) var totalSize: Int64 = 0
+    /// 选中大小增量维护，避免每次渲染都 O(n) 过滤求和
+    private var _selectedSize: Int64 = 0
+
+    var selectedSize: Int64 { _selectedSize }
     var selectedCount: Int { selectedIDs.count }
+
+    /// 选中项中属于系统缓存（com.apple.*）的数量——清理时会强制进废纸篓
+    var selectedSystemCount: Int {
+        items.filter { selectedIDs.contains($0.id) && $0.category == .system }.count
+    }
 
     var totalSizeString: String {
         SizeFormatter.string(from: totalSize)
@@ -76,6 +86,7 @@ final class CacheCleanerModel: ObservableObject {
     init() {
         skipRunningApps = UserDefaults.standard.object(forKey: "skipRunningApps") as? Bool ?? true
         useTrash = UserDefaults.standard.object(forKey: "useTrash") as? Bool ?? false
+        forceTrashForSystem = UserDefaults.standard.object(forKey: "forceTrashForSystem") as? Bool ?? true
     }
 
     @Published var isCheckingPermission = false
@@ -101,12 +112,17 @@ final class CacheCleanerModel: ObservableObject {
 
     func startScan() {
         scanTask?.cancel()
+        scanFlag?.cancel()
         selectedIDs.removeAll()
+        _selectedSize = 0
         cleanReport = nil
 
         let whitelist = self.whitelist
         let running = CacheScanner.runningBundleIDs()
+        let nameTokens = CacheScanner.runningAppNameTokens()
         let xcodeRunning = running.contains("com.apple.dt.Xcode")
+        let flag = CancellationFlag()
+        self.scanFlag = flag
 
         scanTask = Task { [weak self] in
             guard let self else { return }
@@ -124,18 +140,21 @@ final class CacheCleanerModel: ObservableObject {
             let total = sorted.count
             var done = 0
             var results: [CacheItem] = []
+            var sum: Int64 = 0
             let chunkSize = 8
 
             for start in stride(from: 0, to: sorted.count, by: chunkSize) {
-                if Task.isCancelled { break }
+                if flag.isCancelled { break }
                 let end = min(start + chunkSize, sorted.count)
                 let slice = Array(sorted[start..<end])
 
-                // 并行统计一个批次的大小
+                // 并行统计一个批次的大小；后台任务通过显式标志提前中断
                 let sizes = await withTaskGroup(of: (Int, Int64).self) { group in
                     for (i, cand) in slice.enumerated() {
                         group.addTask {
-                            let size = await CacheScanner.directorySizeAsync(cand.url)
+                            let size = await CacheScanner.directorySizeAsync(cand.url) {
+                                flag.isCancelled
+                            }
                             return (i, size)
                         }
                     }
@@ -145,14 +164,20 @@ final class CacheCleanerModel: ObservableObject {
                 }
 
                 for (i, cand) in slice.enumerated() {
-                    if Task.isCancelled { break }
+                    if flag.isCancelled { break }
                     let size = sizes[i] ?? 0
                     if size <= 0 { continue } // 空缓存不展示
 
                     let isRunning: Bool = cand.category == .developer
                         ? xcodeRunning
-                        : running.contains(cand.bundleID ?? cand.url.lastPathComponent)
+                        : CacheScanner.isCacheInUse(
+                            url: cand.url,
+                            bundleID: cand.bundleID,
+                            runningBundleIDs: running,
+                            nameTokens: nameTokens
+                        )
 
+                    sum += size
                     results.append(CacheItem(
                         url: cand.url,
                         name: Self.displayName(for: cand),
@@ -174,8 +199,10 @@ final class CacheCleanerModel: ObservableObject {
             }
 
             let final = results.sorted { $0.size > $1.size }
+            let totalBytes = sum
             await MainActor.run {
                 self.items = final
+                self.totalSize = totalBytes
                 self.isScanning = false
                 self.currentPath = ""
             }
@@ -184,6 +211,7 @@ final class CacheCleanerModel: ObservableObject {
 
     func cancelScan() {
         scanTask?.cancel()
+        scanFlag?.cancel()
         isScanning = false
     }
 
@@ -192,25 +220,29 @@ final class CacheCleanerModel: ObservableObject {
     func toggleSelection(_ item: CacheItem) {
         if selectedIDs.contains(item.id) {
             selectedIDs.remove(item.id)
+            _selectedSize -= item.size
         } else {
             selectedIDs.insert(item.id)
+            _selectedSize += item.size
         }
     }
 
     /// 一键勾选所有「安全」项：非运行中、非白名单
     func selectAllSafe() {
-        selectedIDs = Set(
-            items.filter { !$0.isRunning && !$0.isWhitelisted }.map { $0.id }
-        )
+        let safe = items.filter { !$0.isRunning && !$0.isWhitelisted }
+        selectedIDs = Set(safe.map { $0.id })
+        _selectedSize = safe.reduce(0) { $0 + $1.size }
     }
 
     /// 全选所有项（含运行中、白名单）—— 用户主动承担风险
     func selectAll() {
         selectedIDs = Set(items.map { $0.id })
+        _selectedSize = items.reduce(0) { $0 + $1.size }
     }
 
     func clearSelection() {
         selectedIDs.removeAll()
+        _selectedSize = 0
     }
 
     // MARK: - 清理
@@ -223,6 +255,8 @@ final class CacheCleanerModel: ObservableObject {
         let useTrash = self.useTrash
         let skipRunning = self.skipRunningApps
         let whitelist = self.whitelist
+        let forceTrash = self.forceTrashForSystem
+        let flag = CancellationFlag()
 
         Task { [weak self] in
             guard let self else { return }
@@ -232,21 +266,26 @@ final class CacheCleanerModel: ObservableObject {
                     items: toClean,
                     toTrash: useTrash,
                     skipRunning: skipRunning,
-                    whitelist: whitelist
+                    whitelist: whitelist,
+                    forceTrashForSystem: forceTrash,
+                    isCancelled: { flag.isCancelled }
                 )
             }.value
 
             await MainActor.run {
-                // 只移除「确实清理成功」的项；失败的保留在列表（可能有正在使用的文件）
-                let cleanedIDs = Set(toClean.filter { !result.failedPaths.contains($0.url.path) }.map { $0.id })
-                self.items = self.items.filter { !cleanedIDs.contains($0.id) }
+                // 移除「确实清理过」的项（完整或部分成功）；彻底失败的保留在列表（可能有正在使用的文件）
+                let failedSet = Set(result.failedPaths)
+                let doneIDs = Set(toClean.filter { !failedSet.contains($0.url.path) }.map { $0.id })
+                self.items = self.items.filter { !doneIDs.contains($0.id) }
+                self.totalSize = self.items.reduce(0) { $0 + $1.size }
                 self.selectedIDs.removeAll()
+                self._selectedSize = 0
                 self.isCleaning = false
 
                 let freed = SizeFormatter.string(from: result.freedBytes)
                 self.cleanReport = CleanReport(
                     freedString: freed,
-                    failedCount: result.failedPaths.count,
+                    failedCount: result.totalFailed,
                     skippedCount: result.skippedPaths.count
                 )
             }
@@ -256,24 +295,19 @@ final class CacheCleanerModel: ObservableObject {
     // MARK: - 白名单
 
     var whitelist: Set<String> {
-        Set(UserDefaults.standard.stringArray(forKey: Self.whitelistKey) ?? [])
+        Set(WhitelistStore.paths())
     }
 
     func whitelistPaths() -> [String] {
-        UserDefaults.standard.stringArray(forKey: Self.whitelistKey) ?? []
+        WhitelistStore.paths()
     }
 
     func addWhitelist(_ path: String) {
-        var list = whitelistPaths()
-        guard !list.contains(path) else { return }
-        list.append(path)
-        UserDefaults.standard.set(list, forKey: Self.whitelistKey)
+        WhitelistStore.add(path)
     }
 
     func removeWhitelist(_ path: String) {
-        var list = whitelistPaths()
-        list.removeAll { $0 == path }
-        UserDefaults.standard.set(list, forKey: Self.whitelistKey)
+        WhitelistStore.remove(path)
     }
 
     // MARK: - 辅助
