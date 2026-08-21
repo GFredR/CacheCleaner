@@ -1,0 +1,124 @@
+import SwiftUI
+
+/// 设置窗口：通用（含外观字体）+ 白名单
+struct SettingsView: View {
+    @EnvironmentObject var model: CacheCleanerModel
+    @AppStorage("fontSize") private var fontSize: Double = 13
+    @State private var newWhitelistPath = ""
+    @State private var whitelist: [String] = []
+
+    var body: some View {
+        TabView {
+            generalTab
+                .tabItem { Label("通用", systemImage: "gearshape") }
+
+            whitelistTab
+                .tabItem { Label("白名单", systemImage: "shield.lefthalf.filled") }
+        }
+        .frame(width: 500, height: 340)
+        .onAppear { refresh() }
+    }
+
+    // MARK: - 通用
+
+    private var generalTab: some View {
+        Form {
+            Toggle("跳过正在运行的 App 的缓存", isOn: $model.skipRunningApps)
+            Text("避免清理正在使用中的应用，防止出现异常或数据丢失。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Toggle("清理时移入废纸篓（可恢复）", isOn: $model.useTrash)
+            Text("移入废纸篓后可从废纸篓恢复，但清理速度明显变慢；关闭则直接删除。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Divider()
+
+            Section("外观") {
+                HStack {
+                    Text("列表字体大小")
+                    Spacer()
+                    Slider(value: $fontSize, in: 11...18, step: 0.5)
+                        .frame(width: 180)
+                    Text("\(fontSize, specifier: "%.0f") pt")
+                        .monospacedDigit()
+                        .frame(width: 44, alignment: .trailing)
+                }
+                Text("应用于缓存列表与目录分析列表的文字。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            Button("重新检测「完全磁盘访问权限」") {
+                model.checkPermission()
+            }
+        }
+        .padding()
+        .formStyle(.grouped)
+    }
+
+    // MARK: - 白名单
+
+    private var whitelistTab: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("白名单中的缓存路径在清理时会被强制跳过（前缀匹配）。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                TextField("输入要保留的缓存路径，如 ~/Library/Caches/WeChat", text: $newWhitelistPath)
+                    .textFieldStyle(.roundedBorder)
+                Button("添加") {
+                    let path = newWhitelistPath
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .replacingOccurrences(of: "~", with: FileManager.default.homeDirectoryForCurrentUser.path)
+                    guard !path.isEmpty else { return }
+                    model.addWhitelist(path)
+                    newWhitelistPath = ""
+                    refresh()
+                }
+                .disabled(newWhitelistPath.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+
+            if whitelist.isEmpty {
+                Spacer()
+                Text("暂无白名单")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity)
+                Spacer()
+            } else {
+                List {
+                    ForEach(whitelist, id: \.self) { path in
+                        HStack {
+                            Image(systemName: "shield")
+                                .foregroundStyle(.blue)
+                            Text(path)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                            Button {
+                                model.removeWhitelist(path)
+                                refresh()
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(.plain)
+                            .help("从白名单移除")
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+    }
+
+    private func refresh() {
+        whitelist = model.whitelistPaths()
+    }
+}
