@@ -78,7 +78,7 @@
 - **目录分析树一次性构建**：5 万文件 1.5s 可接受；`List` + `OutlineGroup` 懒加载渲染，默认折叠下无渲染压力
 
 ### 待用户确认
-- **README Release 链接**：写的是 `https://github.com/guofengrui/CacheCleaner/releases`，`guofengrui` 是假设的 GitHub 用户名——若实际用户名不同，push 前需修改
+- **README Release 链接**：已使用真实 GitHub 用户名 `GFredR`（`https://github.com/GFredR/CacheCleaner/releases`）
 
 ---
 

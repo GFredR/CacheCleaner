@@ -69,6 +69,8 @@
 
 ## 🛡️ 安全声明
 
+> **⚠️ 本工具会删除文件，使用前请仔细阅读**
+
 本工具会**删除文件**，请先了解它的行为边界：
 
 - **清理范围**：只删除缓存目录的**内容**（保留目录本身），App 运行时可正常重建
@@ -78,13 +80,15 @@
 - **可审计**：整个项目开源，删除逻辑在 `CacheCleanerService.swift` / `DirectoryAnalysisModel.swift`，可自行核对；目录分析的绿色标记只是**建议**，勾选后仍会弹窗二次确认
 - **免责**：虽经多种保护，仍建议对重要数据保持备份习惯
 
+**使用本工具造成的数据丢失，作者不承担任何责任**（详见 [LICENSE](LICENSE) 中的 AS IS 免责声明）。
+
 ---
 
 ## 📦 安装
 
 ### 方式一：dmg 安装包（推荐普通用户）
 
-从 [Releases](https://github.com/guofengrui/CacheCleaner/releases) 下载 `CacheCleaner-1.0.dmg`，双击打开后将 `CacheCleaner.app` 拖到右侧的「Applications」文件夹即可。
+从 [Releases](https://github.com/GFredR/CacheCleaner/releases) 下载 `CacheCleaner-1.0.dmg`，双击打开后将 `CacheCleaner.app` 拖到右侧的「Applications」文件夹即可。
 
 > **首次打开**：本项目当前**未做 Developer ID 签名与公证**（个人开发者账号需 $99/年）。未签名的 `.app` 在 macOS 上会被 Gatekeeper 拦截，打开方式二选一：
 > 1. **右键点击** `CacheCleaner.app` → 选择「打开」→ 在弹窗中再次点「打开」
@@ -101,7 +105,7 @@
 #### 用脚本打 dmg
 
 ```bash
-git clone https://github.com/guofengrui/CacheCleaner.git
+git clone https://github.com/GFredR/CacheCleaner.git
 cd CacheCleaner
 ./make-dmg.sh   # 自动构建 .app 并打成 CacheCleaner-1.0.dmg
 open CacheCleaner-1.0.dmg
@@ -294,7 +298,7 @@ SPM 的 `swift run` 跑的是裸可执行文件，不是 `.app` bundle，没有 
 - 调整重要性规则：改 `ImportanceClassifier`，并附用例说明
 - UI 改进：保持 SwiftUI 默认样式，避免引入额外依赖
 
-代码风格遵循 [iOS 完整项目开发全局规范](https://github.com/guofengrui/workspace)：
+代码风格遵循 [iOS 完整项目开发全局规范](https://github.com/GFredR/workspace)（如不可访问可参考本地 `AGENTS.md`）。
 
 提交信息使用 Conventional Commits（`feat:` `fix:` `docs:` `chore:` `refactor:` 等）。
 
@@ -311,5 +315,23 @@ SPM 的 `swift run` 跑的是裸可执行文件，不是 `.app` bundle，没有 
 ---
 
 ## 📄 License
+
+本项目采用 [MIT](LICENSE) 协议。
+
+<details>
+<summary><strong>📝 MIT 协议中文摘要（辅助说明，非法律文本）</strong></summary>
+
+> ⚠️ 以下为中文解读，**不具有法律效力**，法律文本以英文 LICENSE 为准。
+
+| 你可以… | 你必须… | 你不能… |
+| --- | --- | --- |
+| ✅ 自由使用、复制、修改本项目 | 📋 在所有副本中保留版权声明 | ❌ 让作者为使用本项目产生的任何损失负责 |
+| ✅ 用于商业目的（包括打包出售） | 📋 保留 MIT 协议原文 | ❌ 用作者名义为衍生作品背书 |
+| ✅ 修改后再分发（保留版权声明即可） | | ❌ 移除或修改原作者的版权信息 |
+| ✅ 申请专利使用（作者明确授予） | | |
+
+**简单说**：随便用、随便改、随便卖，只要保留原作者署名 + 协议原文，作者不背锅。国际上没有"中文版 LICENSE"，法律文本以英文 LICENSE 为准。
+
+</details>
 
 [MIT](LICENSE) © 2026 郭丰锐 (Guo Fengrui)
