@@ -73,8 +73,22 @@ final class CacheCleanerModel: ObservableObject {
         useTrash = UserDefaults.standard.object(forKey: "useTrash") as? Bool ?? false
     }
 
+    @Published var isCheckingPermission = false
+
     func checkPermission() {
-        permissionState = PermissionService.hasFullDiskAccess() ? .granted : .denied
+        // 已在检查中则忽略重复点击，避免 ViewBridge sheet 重入崩溃
+        guard !isCheckingPermission else { return }
+        isCheckingPermission = true
+        Task { [weak self] in
+            // 后台枚举磁盘目录，避免主线程 IO 卡死
+            let granted = await Task.detached(priority: .userInitiated) {
+                PermissionService.hasFullDiskAccess()
+            }.value
+            await MainActor.run {
+                self?.permissionState = granted ? .granted : .denied
+                self?.isCheckingPermission = false
+            }
+        }
     }
 
     // MARK: - 扫描
@@ -181,6 +195,11 @@ final class CacheCleanerModel: ObservableObject {
         selectedIDs = Set(
             items.filter { !$0.isRunning && !$0.isWhitelisted }.map { $0.id }
         )
+    }
+
+    /// 全选所有项（含运行中、白名单）—— 用户主动承担风险
+    func selectAll() {
+        selectedIDs = Set(items.map { $0.id })
     }
 
     func clearSelection() {

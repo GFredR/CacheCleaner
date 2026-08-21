@@ -86,15 +86,6 @@ struct CacheCleanerView: View {
             permissionIndicator
 
             Button {
-                model.selectAllSafe()
-            } label: {
-                Label("勾选安全项", systemImage: "checkmark.circle")
-                    .font(.system(size: fontSize))
-            }
-            .disabled(model.items.isEmpty || model.isScanning)
-            .help("勾选所有非运行中、非白名单的缓存")
-
-            Button {
                 showSettings = true
             } label: {
                 Image(systemName: "gearshape")
@@ -151,8 +142,18 @@ struct CacheCleanerView: View {
             Spacer()
             Button("打开系统设置") { PermissionService.openSystemSettings() }
                 .font(.system(size: fontSize - 1))
-            Button("重新检测") { model.checkPermission() }
-                .font(.system(size: fontSize - 1))
+            Button {
+                model.checkPermission()
+            } label: {
+                HStack(spacing: 4) {
+                    if model.isCheckingPermission {
+                        ProgressView().controlSize(.mini)
+                    }
+                    Text(model.isCheckingPermission ? "检测中…" : "重新检测")
+                }
+            }
+            .font(.system(size: fontSize - 1))
+            .disabled(model.isCheckingPermission)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -220,6 +221,22 @@ struct CacheCleanerView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            Menu {
+                Button("勾选安全项（非运行中/非白名单）") {
+                    model.selectAllSafe()
+                }
+                Button("全选所有项（含运行中）") {
+                    model.selectAll()
+                }
+            } label: {
+                Label("选择", systemImage: "checkmark.circle")
+                    .font(.system(size: fontSize - 1))
+            }
+            .menuStyle(.borderlessButton)
+            .frame(maxWidth: 90)
+            .disabled(model.items.isEmpty || model.isScanning)
+            .help("批量勾选：安全项 / 全部")
+
             Button("清除选择") {
                 model.clearSelection()
             }
