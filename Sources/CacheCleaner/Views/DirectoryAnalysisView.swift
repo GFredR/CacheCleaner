@@ -139,6 +139,8 @@ struct DirectoryAnalysisView: View {
                 }
                 .help("设置（字体大小、白名单等）")
                 .buttonStyle(.borderless)
+                .accessibilityLabel("设置")
+                .accessibilityHint("打开字体大小、白名单、主题等设置")
             }
 
             HStack(spacing: 8) {

@@ -95,7 +95,36 @@
 
 ---
 
-## 五、代码健康度
+## 五、单元测试
+
+> AGENTS.md 第九章要求覆盖 ViewModel 业务逻辑、Model 编解码、工具类核心方法。第四轮复查补齐。
+
+**25 个测试用例，全绿**（`swift test`）：
+
+| 测试文件 | 用例数 | 覆盖 |
+| --- | --- | --- |
+| `DirectoryTreeBuilderTests` | 5 | 嵌套聚合大小/文件数、文件夹排序、文件大小降序、空数组、**100 层深嵌套防栈溢出（回归上次崩溃）** |
+| `ImportanceClassifierTests` | 10 | 7 条分类规则全覆盖 + 大小写 + Caches 覆盖优先级 |
+| `CacheCleanerServiceTests` | 6 | 白名单目录边界（精确匹配/子路径/前缀误匹配防护/多入口/空集） |
+| `DirectoryAnalyzerTests` | 4 | countFiles/analyze 一致性、空目录、**符号链接不跟随（实测防死循环）**、进度回调 |
+
+CI 集成：`.github/workflows/build.yml` 已加 `swift test` 步骤（push/PR 自动跑）。
+
+---
+
+## 六、可访问性（Accessibility）
+
+> AGENTS.md 第十一章要求所有可交互控件 `accessibilityLabel`。
+
+已加标签：
+- 缓存列表勾选按钮（动态：「勾选/取消勾选 + App 名」）
+- 缓存分类图标（动态：分类名「系统/应用/沙盒/开发」）
+- 缓存清理页/目录分析页齿轮按钮（「设置」+ Hint）
+- 文件夹行右键菜单沿用 SwiftUI 自动生成的标签
+
+---
+
+## 七、代码健康度
 
 - 源码 16 文件，分层清晰（Models / Services / ViewModel / Views）
 - ViewModel 无超大文件（CacheCleanerModel 250 行、DirectoryAnalysisModel 190 行）

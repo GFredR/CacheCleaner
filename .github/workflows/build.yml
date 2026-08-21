@@ -1,4 +1,4 @@
-name: Build
+name: Build & Test
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  build-and-test:
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -17,3 +17,6 @@ jobs:
 
       - name: Build
         run: swift build
+
+      - name: Test
+        run: swift test

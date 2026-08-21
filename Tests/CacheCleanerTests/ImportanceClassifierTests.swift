@@ -1,0 +1,80 @@
+import XCTest
+@testable import CacheCleaner
+
+final class ImportanceClassifierTests: XCTestCase {
+
+    private func classify(_ path: String) -> ImportanceLevel {
+        ImportanceClassifier.classify(url: URL(fileURLWithPath: path))
+    }
+
+    // MARK: - 规则 0a：路径含可清理目录段 → 绿
+    func testSafePathSegmentCaches() {
+        XCTAssertEqual(classify("/Users/x/Library/Caches/com.tencent.x/foo.log"), .safeToClean)
+        XCTAssertEqual(classify("/Users/x/tmp/scratch"), .safeToClean)
+        XCTAssertEqual(classify("/Users/x/Projects/A/node_modules/react/index.js"), .safeToClean)
+        XCTAssertEqual(classify("/Users/x/Library/Developer/Xcode/DerivedData/A/Build/Products/x"), .safeToClean)
+    }
+
+    // 规则 0a 优先级高于扩展名：Caches 下的 .swift 也算可清理
+    func testCachesOverridesImportantExtension() {
+        XCTAssertEqual(classify("/Users/x/Library/Caches/foo.swift"), .safeToClean)
+    }
+
+    // MARK: - 规则 0b：.git 目录 → 红
+    func testGitDirectoryIsImportant() {
+        XCTAssertEqual(classify("/Users/x/Project/.git/HEAD"), .important)
+        XCTAssertEqual(classify("/Users/x/Project/.git/refs/heads/main"), .important)
+    }
+
+    // MARK: - 规则 1：重要文件名 → 红
+    func testImportantFileNames() {
+        XCTAssertEqual(classify("/x/README"), .important)
+        XCTAssertEqual(classify("/x/README.md"), .important)
+        XCTAssertEqual(classify("/x/LICENSE"), .important)
+        XCTAssertEqual(classify("/x/Makefile"), .important)
+        XCTAssertEqual(classify("/x/Package.swift"), .important)
+    }
+
+    // MARK: - 规则 2：可清理精确文件名 → 绿
+    func testSafeFileNames() {
+        XCTAssertEqual(classify("/x/.DS_Store"), .safeToClean)
+        XCTAssertEqual(classify("/x/ds_store"), .safeToClean)
+        XCTAssertEqual(classify("/x/thumbs.db"), .safeToClean)
+    }
+
+    // MARK: - 规则 3：重要扩展名 → 红
+    func testImportantExtensions() {
+        XCTAssertEqual(classify("/x/doc.pdf"), .important)
+        XCTAssertEqual(classify("/x/code.swift"), .important)
+        XCTAssertEqual(classify("/x/db.sqlite"), .important)
+        XCTAssertEqual(classify("/x/key.pem"), .important)
+        XCTAssertEqual(classify("/x/config.json"), .important)
+    }
+
+    // MARK: - 规则 4：可清理扩展名 → 绿
+    func testSafeExtensions() {
+        XCTAssertEqual(classify("/x/app.log"), .safeToClean)
+        XCTAssertEqual(classify("/x/build.o"), .safeToClean)
+        XCTAssertEqual(classify("/x/cache.tmp"), .safeToClean)
+        XCTAssertEqual(classify("/x/cache.pyc"), .safeToClean)
+    }
+
+    // MARK: - 规则 6：谨慎扩展名 → 黄
+    func testCautiousExtensions() {
+        XCTAssertEqual(classify("/x/archive.zip"), .cautious)
+        XCTAssertEqual(classify("/x/app.app"), .cautious)
+        XCTAssertEqual(classify("/x/backup.bak"), .cautious)
+        XCTAssertEqual(classify("/x/lib.dylib"), .cautious)
+    }
+
+    // MARK: - 规则 7：兜底 → 黄
+    func testUnknownTypeIsCautious() {
+        XCTAssertEqual(classify("/x/unknown_no_extension_file"), .cautious)
+    }
+
+    // MARK: - 大小写敏感：扩展名应小写比较
+    func testExtensionCaseInsensitive() {
+        XCTAssertEqual(classify("/x/PHOTO.PDF"), .important)
+        XCTAssertEqual(classify("/x/LOG.LOG"), .safeToClean)
+    }
+}

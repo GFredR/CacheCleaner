@@ -24,11 +24,13 @@ struct CacheRowView: View {
                 }
                 .buttonStyle(.plain)
                 .help("勾选/取消")
+                .accessibilityLabel(isSelected ? "取消勾选 \(item.name)" : "勾选 \(item.name)")
 
                 Image(systemName: item.category.systemImage)
                     .font(.system(size: fontSize + 2))
                     .foregroundStyle(.secondary)
                     .frame(width: 22)
+                    .accessibilityLabel(item.category.rawValue)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name)

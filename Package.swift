@@ -10,6 +10,11 @@ let package = Package(
         .executableTarget(
             name: "CacheCleaner",
             path: "Sources/CacheCleaner"
+        ),
+        .testTarget(
+            name: "CacheCleanerTests",
+            dependencies: ["CacheCleaner"],
+            path: "Tests/CacheCleanerTests"
         )
     ]
 )
