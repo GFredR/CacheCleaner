@@ -139,7 +139,7 @@ final class CacheCleanerModel: ObservableObject {
                         category: cand.category,
                         size: size,
                         isRunning: isRunning,
-                        isWhitelisted: whitelist.contains(where: { cand.url.path.hasPrefix($0) })
+                        isWhitelisted: CacheCleanerService.isWhitelisted(cand.url, whitelist: whitelist)
                     ))
                 }
 
@@ -194,25 +194,37 @@ final class CacheCleanerModel: ObservableObject {
         guard !toClean.isEmpty else { return }
 
         isCleaning = true
-        let result = CacheCleanerService.clean(
-            items: toClean,
-            toTrash: useTrash,
-            skipRunning: skipRunningApps,
-            whitelist: whitelist
-        )
+        let useTrash = self.useTrash
+        let skipRunning = self.skipRunningApps
+        let whitelist = self.whitelist
 
-        // 已清理的项从列表移除
-        let cleanedIDs = Set(toClean.map { $0.id })
-        items = items.filter { !cleanedIDs.contains($0.id) }
-        selectedIDs.removeAll()
-        isCleaning = false
+        Task { [weak self] in
+            guard let self else { return }
+            // 后台执行（directorySize + 删除可能耗时很久，不能阻塞主线程）
+            let result = await Task.detached(priority: .userInitiated) {
+                CacheCleanerService.clean(
+                    items: toClean,
+                    toTrash: useTrash,
+                    skipRunning: skipRunning,
+                    whitelist: whitelist
+                )
+            }.value
 
-        let freed = ByteCountFormatter.string(fromByteCount: result.freedBytes, countStyle: .file)
-        cleanReport = CleanReport(
-            freedString: freed,
-            failedCount: result.failedPaths.count,
-            skippedCount: result.skippedPaths.count
-        )
+            await MainActor.run {
+                // 只移除「确实清理成功」的项；失败的保留在列表（可能有正在使用的文件）
+                let cleanedIDs = Set(toClean.filter { !result.failedPaths.contains($0.url.path) }.map { $0.id })
+                self.items = self.items.filter { !cleanedIDs.contains($0.id) }
+                self.selectedIDs.removeAll()
+                self.isCleaning = false
+
+                let freed = ByteCountFormatter.string(fromByteCount: result.freedBytes, countStyle: .file)
+                self.cleanReport = CleanReport(
+                    freedString: freed,
+                    failedCount: result.failedPaths.count,
+                    skippedCount: result.skippedPaths.count
+                )
+            }
+        }
     }
 
     // MARK: - 白名单

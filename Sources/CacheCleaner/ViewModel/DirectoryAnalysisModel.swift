@@ -139,33 +139,43 @@ final class DirectoryAnalysisModel: ObservableObject {
         guard !targets.isEmpty else { return }
 
         isCleaning = true
-        let fm = FileManager.default
-        var freed: Int64 = 0
-        var failed = 0
+        let rootURL = self.rootURL
 
-        for file in targets {
-            do {
-                if useTrash {
-                    try fm.trashItem(at: file.url, resultingItemURL: nil)
-                } else {
-                    try fm.removeItem(at: file.url)
+        Task { [weak self] in
+            guard let self else { return }
+            // 后台执行删除（大量小文件删除可能耗时，不能阻塞主线程）
+            let result = await Task.detached(priority: .userInitiated) {
+                let fm = FileManager.default
+                var freed: Int64 = 0
+                var failed: [String] = []
+                for file in targets {
+                    do {
+                        if useTrash {
+                            try fm.trashItem(at: file.url, resultingItemURL: nil)
+                        } else {
+                            try fm.removeItem(at: file.url)
+                        }
+                        freed += file.size
+                    } catch {
+                        failed.append(file.url.path)
+                    }
                 }
-                freed += file.size
-            } catch {
-                failed += 1
+                return (freed: freed, failed: failed)
+            }.value
+
+            await MainActor.run {
+                // 只移除成功删除的；失败项保留（可能是正在使用/无权限）
+                let cleanedIDs = Set(targets.filter { !result.failed.contains($0.url.path) }.map { $0.id })
+                self.files = self.files.filter { !cleanedIDs.contains($0.id) }
+                self.tree = DirectoryTreeBuilder.build(from: self.files, rootURL: rootURL ?? URL(fileURLWithPath: "/"))
+                self.selectedIDs.removeAll()
+                self.isCleaning = false
+
+                let freedString = ByteCountFormatter.string(fromByteCount: result.freed, countStyle: .file)
+                self.cleanReport = result.failed.isEmpty
+                    ? "成功释放 \(freedString)"
+                    : "成功释放 \(freedString)，\(result.failed.count) 个文件删除失败（可能正在使用）"
             }
         }
-
-        // 从列表移除已删除的，并重建目录树
-        let cleanedIDs = Set(targets.map { $0.id })
-        files = files.filter { !cleanedIDs.contains($0.id) }
-        tree = DirectoryTreeBuilder.build(from: files, rootURL: rootURL ?? URL(fileURLWithPath: "/"))
-        selectedIDs.removeAll()
-        isCleaning = false
-
-        let freedString = ByteCountFormatter.string(fromByteCount: freed, countStyle: .file)
-        cleanReport = failed > 0
-            ? "成功释放 \(freedString)，\(failed) 个文件删除失败（可能正在使用）"
-            : "成功释放 \(freedString)"
     }
 }

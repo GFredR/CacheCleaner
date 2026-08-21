@@ -42,7 +42,7 @@ struct SettingsView: View {
                     Spacer()
                     Slider(value: $fontSize, in: 11...18, step: 0.5)
                         .frame(width: 180)
-                    Text("\(fontSize, specifier: "%.0f") pt")
+                    Text("\(fontSize, specifier: "%.1f") pt")
                         .monospacedDigit()
                         .frame(width: 44, alignment: .trailing)
                 }

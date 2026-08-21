@@ -44,7 +44,9 @@ struct CacheCleanerView: View {
             Button("取消", role: .cancel) {}
             Button("清理", role: .destructive) { model.cleanSelected() }
         } message: {
-            Text("将删除 \(model.selectedCount) 项缓存，预计释放 \(model.selectedSizeString)。\n此操作不可撤销，正在使用的 App 可能需要重启。")
+            Text(model.useTrash
+                 ? "将把 \(model.selectedCount) 项缓存移入废纸篓，预计释放 \(model.selectedSizeString)。\n可在废纸篓中恢复，正在使用的 App 可能需要重启。"
+                 : "将删除 \(model.selectedCount) 项缓存，预计释放 \(model.selectedSizeString)。\n此操作不可撤销，正在使用的 App 可能需要重启。")
         }
         .alert("清理完成", isPresented: reportPresented) {
             Button("好", role: .cancel) {}
