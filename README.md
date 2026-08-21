@@ -239,5 +239,5 @@ CacheCleaner/
 
 - 苹果 SF Symbols 提供的免费图标（垃圾桶/盾牌/扫描/星星等）
 - 项目启动时参考了 [CleanMyMac](https://macpaw.com/cleanmymac) 的 UX 思路
-- AI 协作：开发过程大量由 AI 辅助（架构设计、代码生成、bug 排查、安全审查），但每一行代码都经过实际编译运行验证
+- AI 协作：开发过程大量由 AI 辅助（架构设计、代码生成、bug 排查、安全审查）
 - 4 轮代码审查（commit 链 `1c9a1d6` → `1e13d20` → `8ac7905` → `8fe7e0e` → `6b39274` → `8c46dc9` → `a2afe50` → `b085e46`）捕到 19+ 处真实 bug
