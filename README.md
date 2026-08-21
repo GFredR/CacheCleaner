@@ -157,11 +157,11 @@ CacheCleaner/
 │   └── ARCHITECTURE.md                    # 架构与数据流说明
 ├── .github/workflows/build.yml            # GitHub Actions CI（自动 swift build）
 ├── build-app.sh                           # 把 SPM 产物打成 CacheCleaner.app
-├── build-icon.swift                       # 生成默认占位图标（仅当未自定义时）
+├── build-icon-variants.swift              # 批量生成图标候选 / 默认「垃圾桶·蓝」图标
 ├── build-dmg-background.swift             # 生成 dmg 安装背景图
 ├── make-dmg.sh                            # 一键打成 CacheCleaner-<version>.dmg
 ├── Resources/
-│   ├── AppIcon.png                        # 1024x1024 图标（已用 AI 设计，可替换）
+│   ├── AppIcon.png                        # 1024x1024 图标（默认「垃圾桶·蓝」，可替换）
 │   ├── dmg-background.png                 # dmg 安装器背景图（自动生成）
 │   └── donate-wechat.png                  # 微信收款码（打赏用，自行放入）
 └── Sources/CacheCleaner/

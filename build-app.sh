@@ -17,7 +17,10 @@ swift build --disable-sandbox -c release
 echo "→ 准备图标"
 mkdir -p Resources
 if [ ! -f "$ICON_PNG" ]; then
-    swift build-icon.swift "$ICON_PNG"
+    # 默认生成「垃圾桶·蓝」图标（与正式图标一致）
+    swift build-icon-variants.swift trash "$ICON_PNG"
+    sips -z 1024 1024 "$ICON_PNG" --out /tmp/appicon-1024.png > /dev/null
+    mv /tmp/appicon-1024.png "$ICON_PNG"
 fi
 
 echo "→ 构建 .app bundle"
@@ -40,6 +43,7 @@ sips -z 512 512  "$ICON_PNG" --out "$ICONSET/icon_256x256@2x.png"  > /dev/null
 sips -z 512 512  "$ICON_PNG" --out "$ICONSET/icon_512x512.png"     > /dev/null
 cp "$ICON_PNG" "$ICONSET/icon_512x512@2x.png"
 iconutil -c icns "$ICONSET" -o "$CONTENTS/Resources/AppIcon.icns"
+rm -rf "$ICONSET"
 
 # Info.plist
 cat > "$CONTENTS/Info.plist" <<EOF
