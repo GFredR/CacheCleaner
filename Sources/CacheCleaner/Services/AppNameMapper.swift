@@ -4,8 +4,12 @@ import Foundation
 enum AppNameMapper {
 
     private static var nameCache: [String: String] = [:]
+    /// 缓存可能被后台扫描线程写入，加锁防数据竞争
+    private static let cacheLock = NSLock()
 
     static func displayName(forBundleID bundleID: String) -> String? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
         if let cached = nameCache[bundleID] { return cached }
         guard let name = lookup(bundleID) else { return nil }
         nameCache[bundleID] = name

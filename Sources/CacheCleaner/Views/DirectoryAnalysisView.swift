@@ -159,7 +159,7 @@ struct DirectoryAnalysisView: View {
                 Text("\(level.label)")
                     .font(.system(size: fontSize - 2))
                     .foregroundStyle(.secondary)
-                Text("\(model.files(of: level).count) 个 · \(byteString(model.size(of: level)))")
+                Text("\(model.count(of: level)) 个 · \(byteString(model.size(of: level)))")
                     .font(.system(size: fontSize, weight: .medium))
                     .monospacedDigit()
             }
@@ -284,7 +284,7 @@ struct DirectoryAnalysisView: View {
                 model.selectAllCleanable()
             }
             .font(.system(size: fontSize - 1))
-            .disabled(model.files(of: .safeToClean).isEmpty)
+            .disabled(model.count(of: .safeToClean) == 0)
 
             Button(role: .destructive) {
                 if useTrash {

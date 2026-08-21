@@ -26,14 +26,30 @@ final class DirectoryAnalysisModel: ObservableObject {
 
     // MARK: - 统计
 
+    /// 每个重要性等级的文件数与总大小（一次性缓存，避免每次 body 刷新 O(3n) filter）
+    private(set) var levelCounts: [ImportanceLevel: Int] = [:]
+    private(set) var levelSizes: [ImportanceLevel: Int64] = [:]
+
     var totalSize: Int64 { files.reduce(0) { $0 + $1.size } }
 
-    func files(of level: ImportanceLevel) -> [AnalyzedFile] {
-        files.filter { $0.level == level }
+    func count(of level: ImportanceLevel) -> Int {
+        levelCounts[level] ?? 0
     }
 
     func size(of level: ImportanceLevel) -> Int64 {
-        files.filter { $0.level == level }.reduce(0) { $0 + $1.size }
+        levelSizes[level] ?? 0
+    }
+
+    /// 全列表一次性统计红黄绿数量与大小（扫描完成/清理后调用）
+    private func recomputeStats() {
+        var counts: [ImportanceLevel: Int] = [:]
+        var sizes: [ImportanceLevel: Int64] = [:]
+        for f in files {
+            counts[f.level, default: 0] += 1
+            sizes[f.level, default: 0] += f.size
+        }
+        levelCounts = counts
+        levelSizes = sizes
     }
 
     var selectedSize: Int64 {
@@ -62,6 +78,8 @@ final class DirectoryAnalysisModel: ObservableObject {
         scanTask?.cancel()
         files = []
         tree = []
+        levelCounts = [:]
+        levelSizes = [:]
         selectedIDs = []
         cleanReport = nil
         errorMessage = nil
@@ -101,6 +119,7 @@ final class DirectoryAnalysisModel: ObservableObject {
                     return $0.size > $1.size
                 }
                 self.tree = DirectoryTreeBuilder.build(from: self.files, rootURL: url)
+                self.recomputeStats()
                 // 默认勾选所有可安全清理项
                 self.selectedIDs = Set(
                     self.files.filter { $0.level == .safeToClean }.map { $0.id }
@@ -168,6 +187,7 @@ final class DirectoryAnalysisModel: ObservableObject {
                 let cleanedIDs = Set(targets.filter { !result.failed.contains($0.url.path) }.map { $0.id })
                 self.files = self.files.filter { !cleanedIDs.contains($0.id) }
                 self.tree = DirectoryTreeBuilder.build(from: self.files, rootURL: rootURL ?? URL(fileURLWithPath: "/"))
+                self.recomputeStats()
                 self.selectedIDs.removeAll()
                 self.isCleaning = false
 

@@ -252,6 +252,9 @@ let sim = home.appendingPathComponent("Library/Developer/CoreSimulator")
 **为什么扫描结果比 CleanMyMac 少？**
 未授权「完全磁盘访问权限」时，受 TCC 保护的目录不可见；另外本工具暂不处理系统级缓存 `/Library/Caches`（需 root）。
 
+**目录分析里 .app 包的大小怎么不计入？**
+为性能与安全考虑，目录分析默认跳过 `.app` / `.bundle` 等包的内部内容（`skipsPackageDescendants`），所以拖入 /Applications 时每个 App 只统计外壳文件。想统计包内部可自行改 `DirectoryAnalyzer.swift` 的 `options` 去掉该选项。
+
 **删除的文件能找回吗？**
 默认直接删除不可找回；在「设置 → 通用」里打开「清理时移入废纸篓」后可恢复。
 
