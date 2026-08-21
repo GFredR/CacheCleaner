@@ -89,28 +89,25 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
 
             HStack {
-                TextField("输入或点浏览选择要保留的缓存路径", text: $newWhitelistPath)
+                TextField("输入路径后点添加，或点浏览…选择文件夹", text: $newWhitelistPath)
                     .textFieldStyle(.roundedBorder)
+                    .onSubmit { addFromField() }   // Enter 也能添加
                 Button("浏览…") {
                     let panel = NSOpenPanel()
                     panel.canChooseFiles = false
                     panel.canChooseDirectories = true
-                    panel.allowsMultipleSelection = false
-                    panel.prompt = "选择"
-                    panel.message = "选择要加入白名单的文件夹（其下缓存清理时将被跳过）"
-                    if panel.runModal() == .OK, let url = panel.url {
-                        newWhitelistPath = url.path
+                    panel.allowsMultipleSelection = true
+                    panel.prompt = "添加到白名单"
+                    panel.message = "选择一个或多个文件夹，其下缓存清理时将被跳过"
+                    if panel.runModal() == .OK {
+                        // 选中即自动添加（用户预期：选了 = 保存了）
+                        for url in panel.urls {
+                            model.addWhitelist(url.path)
+                        }
+                        refresh()
                     }
                 }
-                Button("添加") {
-                    let path = newWhitelistPath
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                        .replacingOccurrences(of: "~", with: FileManager.default.homeDirectoryForCurrentUser.path)
-                    guard !path.isEmpty else { return }
-                    model.addWhitelist(path)
-                    newWhitelistPath = ""
-                    refresh()
-                }
+                Button("添加") { addFromField() }
                 .disabled(newWhitelistPath.trimmingCharacters(in: .whitespaces).isEmpty)
             }
 
@@ -151,5 +148,16 @@ struct SettingsView: View {
 
     private func refresh() {
         whitelist = model.whitelistPaths()
+    }
+
+    /// 从 TextField 读取并添加（用于 Enter 提交 + 「添加」按钮）
+    private func addFromField() {
+        let path = newWhitelistPath
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "~", with: FileManager.default.homeDirectoryForCurrentUser.path)
+        guard !path.isEmpty else { return }
+        model.addWhitelist(path)
+        newWhitelistPath = ""
+        refresh()
     }
 }

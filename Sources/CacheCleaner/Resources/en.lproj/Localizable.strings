@@ -23,10 +23,10 @@
 
 /*  Settings · Whitelist  */
 "白名单中的缓存路径在清理时会被强制跳过（前缀匹配）。" = "Whitelisted cache paths are forcibly skipped during cleanup (prefix match).";
-"输入或点浏览选择要保留的缓存路径" = "Type or click Browse to choose a path to keep";
+"输入或点浏览选择要保留的缓存路径" = "Type a path and click Add, or click Browse… to choose folder(s)";
 "浏览…" = "Browse…";
 "选择" = "Choose";
-"选择要加入白名单的文件夹（其下缓存清理时将被跳过）" = "Choose a folder to whitelist (its caches will be skipped during cleanup)";
+"选择要加入白名单的文件夹（其下缓存清理时将被跳过）" = "Choose one or more folders; their caches will be skipped during cleanup";
 "添加" = "Add";
 "暂无白名单" = "No whitelist yet";
 "从白名单移除" = "Remove from whitelist";
