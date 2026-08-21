@@ -151,6 +151,7 @@ final class CacheCleanerModel: ObservableObject {
                         url: cand.url,
                         name: Self.displayName(for: cand),
                         category: cand.category,
+                        bundleID: cand.bundleID,
                         size: size,
                         isRunning: isRunning,
                         isWhitelisted: CacheCleanerService.isWhitelisted(cand.url, whitelist: whitelist)

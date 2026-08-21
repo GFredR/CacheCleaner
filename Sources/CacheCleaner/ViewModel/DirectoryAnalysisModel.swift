@@ -68,6 +68,8 @@ final class DirectoryAnalysisModel: ObservableObject {
 
     /// 开始分析一个目录（拖拽或文件选择器传入）
     func analyze(_ url: URL) {
+        // 清理进行中不允许切换目录（避免异步清理结果覆盖新扫描）
+        guard !isCleaning else { return }
         let fm = FileManager.default
         var isDir: ObjCBool = false
         guard fm.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else {

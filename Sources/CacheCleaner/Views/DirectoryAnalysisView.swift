@@ -128,6 +128,7 @@ struct DirectoryAnalysisView: View {
                     Label("更换目录", systemImage: "folder")
                         .font(.system(size: fontSize))
                 }
+                .disabled(model.isCleaning)
                 .help("重新选择要分析的目录")
 
                 Button {
@@ -284,7 +285,7 @@ struct DirectoryAnalysisView: View {
                 model.selectAllCleanable()
             }
             .font(.system(size: fontSize - 1))
-            .disabled(model.count(of: .safeToClean) == 0)
+            .disabled(model.count(of: .safeToClean) == 0 || model.isCleaning)
 
             Button(role: .destructive) {
                 if useTrash {

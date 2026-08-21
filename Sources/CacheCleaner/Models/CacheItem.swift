@@ -25,6 +25,8 @@ struct CacheItem: Identifiable, Hashable {
     let url: URL
     var name: String
     var category: CacheCategory
+    /// bundle id / 容器 id（用于清理时实时判断运行状态；nil 时退化为用目录名判断）
+    var bundleID: String?
     var size: Int64
     var isRunning: Bool
     var isWhitelisted: Bool
@@ -33,6 +35,7 @@ struct CacheItem: Identifiable, Hashable {
         url: URL,
         name: String,
         category: CacheCategory,
+        bundleID: String? = nil,
         size: Int64 = 0,
         isRunning: Bool = false,
         isWhitelisted: Bool = false
@@ -41,6 +44,7 @@ struct CacheItem: Identifiable, Hashable {
         self.url = url
         self.name = name
         self.category = category
+        self.bundleID = bundleID
         self.size = size
         self.isRunning = isRunning
         self.isWhitelisted = isWhitelisted

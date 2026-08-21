@@ -13,10 +13,10 @@ struct SettingsContainer: View {
                 Spacer()
                 Button("完成") { dismiss() }
                     .keyboardShortcut(.defaultAction)
-                    .onExitCommand { dismiss() }   // Esc 关闭
                     .padding(10)
             }
         }
         .frame(width: 500, height: 420)
+        .onExitCommand { dismiss() }   // Esc 关闭（容器级，无焦点子视图也生效）
     }
 }

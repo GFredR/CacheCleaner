@@ -32,11 +32,12 @@ enum CacheCleanerService {
 
         for item in items {
             // 实时复核：此刻是否正在运行（而不是扫描时的快照）
+            // 用保存的 bundleID（沙盒容器 id / 缓存目录名）判断，避免沙盒路径尾段"Caches"误判
             let running: Bool
             if item.category == .developer {
                 running = xcodeRunning
             } else {
-                let bid = item.url.lastPathComponent
+                let bid = item.bundleID ?? item.url.lastPathComponent
                 running = runningNow.contains(bid)
             }
             if skipRunning && running {

@@ -101,7 +101,7 @@ struct CacheCleanerView: View {
                     .font(.system(size: fontSize))
             }
             .keyboardShortcut("r", modifiers: .command)
-            .disabled(model.isScanning)
+            .disabled(model.isScanning || model.isCleaning)
             .buttonStyle(.borderedProminent)
         }
         .padding(12)
@@ -234,14 +234,14 @@ struct CacheCleanerView: View {
             }
             .menuStyle(.borderlessButton)
             .frame(maxWidth: 90)
-            .disabled(model.items.isEmpty || model.isScanning)
+            .disabled(model.items.isEmpty || model.isScanning || model.isCleaning)
             .help("批量勾选：安全项 / 全部")
 
             Button("清除选择") {
                 model.clearSelection()
             }
             .font(.system(size: fontSize - 1))
-            .disabled(model.selectedCount == 0)
+            .disabled(model.selectedCount == 0 || model.isCleaning)
 
             Button(role: .destructive) {
                 if model.useTrash {
