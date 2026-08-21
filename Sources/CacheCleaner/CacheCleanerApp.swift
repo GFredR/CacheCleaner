@@ -5,12 +5,19 @@ import AppKit
 struct CacheCleanerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var model = CacheCleanerModel()
+    @AppStorage("appearance") private var appearanceRaw: String = AppearanceMode.system.rawValue
+
+    private var appearanceMode: AppearanceMode {
+        AppearanceMode(rawValue: appearanceRaw) ?? .system
+    }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(model)
                 .frame(minWidth: 780, minHeight: 540)
+                .preferredColorScheme(appearanceMode.colorScheme)
+                .onAppear { applyAppearance() }
         }
         .windowResizability(.contentSize)
 
@@ -18,6 +25,11 @@ struct CacheCleanerApp: App {
             SettingsView()
                 .environmentObject(model)
         }
+    }
+
+    /// 应用外观：AppKit 全局（macOS 13 保底）+ SwiftUI 窗口级（14+）双保险
+    private func applyAppearance() {
+        NSApp.appearance = appearanceMode.nsAppearance
     }
 }
 

@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// 设置窗口：通用（含外观字体）+ 白名单
+/// 设置窗口：通用（含外观字体/主题）+ 白名单
 struct SettingsView: View {
     @EnvironmentObject var model: CacheCleanerModel
     @AppStorage("fontSize") private var fontSize: Double = 13
+    @AppStorage("appearance") private var appearanceRaw: String = AppearanceMode.system.rawValue
     @State private var newWhitelistPath = ""
     @State private var whitelist: [String] = []
 
@@ -15,7 +16,7 @@ struct SettingsView: View {
             whitelistTab
                 .tabItem { Label("白名单", systemImage: "shield.lefthalf.filled") }
         }
-        .frame(width: 500, height: 340)
+        .frame(width: 500, height: 360)
         .onAppear { refresh() }
     }
 
@@ -46,6 +47,24 @@ struct SettingsView: View {
                         .frame(width: 44, alignment: .trailing)
                 }
                 Text("应用于缓存列表与目录分析列表的文字。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Picker("主题", selection: Binding(
+                    get: { appearanceRaw },
+                    set: { newValue in
+                        appearanceRaw = newValue
+                        // AppKit 全局外观，macOS 13+ 即时生效
+                        let mode = AppearanceMode(rawValue: newValue) ?? .system
+                        NSApp.appearance = mode.nsAppearance
+                    }
+                )) {
+                    ForEach(AppearanceMode.allCases) { mode in
+                        Text(mode.label).tag(mode.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text("浅色 / 深色 / 跟随系统，切换即时生效。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

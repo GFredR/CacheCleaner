@@ -3,9 +3,13 @@
 .swiftpm/
 DerivedData/
 
-# 打包产物（build-app.sh 生成）
+# 打包产物（build-app.sh / make-dmg.sh 生成）
 CacheCleaner.app/
+CacheCleaner-*.dmg
 *.dSYM
+
+# dmg 安装器背景图（make-dmg.sh 首次运行时自动生成）
+Resources/dmg-background.png
 
 # macOS
 .DS_Store
