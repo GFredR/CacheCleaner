@@ -178,6 +178,18 @@ CacheCleaner/
 
 ---
 
+## ☕ 支持作者
+
+如果 CacheCleaner 帮你腾出了空间，欢迎打赏（一杯咖啡即可）：
+
+<div align="center">
+<img src="Resources/donate-wechat.png" width="260" alt="微信打赏二维码"/>
+</div>
+
+> 收款码仅用于本项目的自愿打赏，请勿他用。
+
+---
+
 ## 📄 License
 
 本项目采用 [MIT](LICENSE) 协议。
@@ -198,7 +210,7 @@ CacheCleaner/
 
 </details>
 
-[MIT](LICENSE) © 2026 郭丰锐 (Guo Fengrui)
+[MIT](LICENSE) © 2026 GFredR
 
 ---
 
