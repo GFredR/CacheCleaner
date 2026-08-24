@@ -6,13 +6,20 @@ set -e
 APP_NAME="CacheCleaner"
 BUNDLE_ID="com.guofengrui.cachecleaner"
 VERSION="1.0"
-BUILD_DIR=".build/release"
+# 优先 Universal 2（arm64 + x86_64）产物：Intel 与 Apple Silicon 都能原生跑
+# 失败时回退单架构产物
+BUILD_DIR=".build/apple/Products/Release"
+if [ ! -f "$BUILD_DIR/$APP_NAME" ]; then
+    BUILD_DIR=".build/release"
+fi
 APP_DIR="$APP_NAME.app"
 CONTENTS="$APP_DIR/Contents"
 ICON_PNG="Resources/AppIcon.png"
 
-echo "→ swift build -c release"
-swift build --disable-sandbox -c release
+echo "→ swift build -c release --arch arm64 --arch x86_64"
+swift build --disable-sandbox -c release --arch arm64 --arch x86_64
+# 产物在 .build/apple/Products/Release（SPM 多架构构建的汇聚路径）
+BUILD_DIR=".build/apple/Products/Release"
 
 echo "→ 准备图标"
 mkdir -p Resources
