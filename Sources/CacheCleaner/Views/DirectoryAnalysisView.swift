@@ -12,15 +12,12 @@ struct DirectoryAnalysisView: View {
     @State private var showSettings = false
     /// 懒加载展开：只渲染已展开路径下的可见行；未展开的文件夹不实例化其子树
     @State private var expandedFolderIDs: Set<UUID> = []
-    /// 每个已展开文件夹实际展示到第几个子节点（分批加载，避免一次插入几万行卡顿）
-    @State private var revealedChildByFolder: [UUID: Int] = [:]
-    /// 可见行缓存：仅当 tree/展开/分批次变化时重建；勾选只改 selectedIDs，不重建
+    /// 可见行缓存：仅当 tree/展开变化时重建；勾选只改 selectedIDs，不重建
     @State private var visibleRows: [DirectoryRowItem] = []
     /// 结构版本号：每次重建 visibleRows 时 +1，供 NSTableView 判定是否需要 reload
     @State private var tableRevision = 0
-
-    /// 每次「加载更多」追加的行数。单批必须小：一次性插入过多行是展开卡顿的主因。
-    private let revealBatch = 400
+    /// 首次出现标记：onAppear 只在首次重建一次，避免 Tab 切回时重复整棵可见行重建
+    @State private var didAppear = false
 
     private func rebuildVisibleRows() {
         visibleRows = buildVisibleRows()
@@ -75,11 +72,14 @@ struct DirectoryAnalysisView: View {
             SettingsContainer()
         }
         .onAppear {
+            // 仅在首次出现时重建一次；tree/展开/分批次都有各自的 onChange 驱动重建，
+            // 切回 Tab 时不再重复整棵可见行重建。
+            guard !didAppear else { return }
+            didAppear = true
             rebuildVisibleRows()
         }
         .onChange(of: model.rootURL) { _ in
             expandedFolderIDs = []
-            revealedChildByFolder = [:]
             visibleRows = []
             tableRevision += 1
         }
@@ -87,9 +87,6 @@ struct DirectoryAnalysisView: View {
             rebuildVisibleRows()
         }
         .onChange(of: expandedFolderIDs) { _ in
-            rebuildVisibleRows()
-        }
-        .onChange(of: revealedChildByFolder) { _ in
             rebuildVisibleRows()
         }
     }
@@ -252,27 +249,21 @@ struct DirectoryAnalysisView: View {
                 revision: tableRevision,
                 fontSize: fontSize,
                 isFolderExpanded: { id in expandedFolderIDs.contains(id) },
-                onToggleExpand: { node in toggleExpand(node) },
-                onLoadMore: { info in loadMore(info) }
+                onToggleExpand: { node in toggleExpand(node) }
             )
         }
     }
 
-    /// 构造可见行集合的具体实现
+    /// 构造可见行集合的具体实现。
+    /// 展开的文件夹直接全量放入子节点（NSTableView 虚拟化，只渲染可见行，数组本身无压力）
     private func buildVisibleRows() -> [DirectoryRowItem] {
         var items: [DirectoryRowItem] = []
         func collect(_ nodes: [DirectoryNode], depth: Int) {
             for n in nodes {
                 items.append(DirectoryRowItem(node: n, depth: depth))
                 if n.isFolder, expandedFolderIDs.contains(n.id) {
-                    let children = n.children ?? []
-                    let revealed = effectiveRevealed(n.id)
-                    for c in children.prefix(revealed) {
+                    for c in (n.children ?? []) {
                         collect([c], depth: depth + 1)
-                    }
-                    let remaining = children.count - revealed
-                    if remaining > 0 {
-                        items.append(DirectoryRowItem.more(folderID: n.id, depth: depth + 1, remaining: remaining))
                     }
                 }
             }
@@ -281,26 +272,14 @@ struct DirectoryAnalysisView: View {
         return items
     }
 
-    /// 某个展开文件夹当前应展示的子节点数（未点过「加载更多」→ 首次只展示一批）
-    private func effectiveRevealed(_ folderID: UUID) -> Int {
-        revealedChildByFolder[folderID] ?? revealBatch
-    }
-
     /// 展开/折叠某个文件夹
     private func toggleExpand(_ node: DirectoryNode) {
         guard node.isFolder else { return }
         if expandedFolderIDs.contains(node.id) {
             expandedFolderIDs.remove(node.id)
-            revealedChildByFolder[node.id] = nil
         } else {
             expandedFolderIDs.insert(node.id)
-            revealedChildByFolder[node.id] = nil
         }
-    }
-
-    /// 「加载更多」：给该文件夹再追加一批子节点（不加动画，避免批量插入行抖动）
-    private func loadMore(_ more: DirectoryLoadMoreInfo) {
-        revealedChildByFolder[more.folderID, default: revealBatch] += revealBatch
     }
 
     /// 扫描中视图：进度条 + 百分比 + 已处理数/总数 + 当前路径 + 取消按钮
@@ -430,12 +409,10 @@ struct DirectoryAnalysisView: View {
             : "清理可清理项"
     }
 
-    /// 清理入口：若选中了受保护(红/黄)文件则走强确认，否则按原逻辑
+    /// 清理入口：若选中了受保护(红/黄)文件则走强确认，否则统一走普通确认（废纸篓同样确认）
     private func requestClean() {
         if model.hasProtectedSelected {
             showProtectedConfirm = true
-        } else if useTrash {
-            model.cleanSelected(useTrash: true)
         } else {
             showCleanConfirm = true
         }
@@ -512,32 +489,15 @@ struct DirectoryAnalysisView: View {
 
 // MARK: - 树节点行
 
-/// 「加载更多」信息：某文件夹剩余未展示的子文件数
-struct DirectoryLoadMoreInfo {
-    let folderID: UUID
-    let depth: Int
-    let remaining: Int
-}
-
-/// 懒加载可见行的扁平项：正常节点 或 批量加载哨兵行
+/// 懒加载可见行的扁平项
 struct DirectoryRowItem: Identifiable {
-    let node: DirectoryNode?
+    let node: DirectoryNode
     let depth: Int
-    let more: DirectoryLoadMoreInfo?
-    var id: String {
-        if let more { return "more-\(more.folderID)" }
-        return node!.id.uuidString
-    }
+    var id: UUID { node.id }
 
-    init(node: DirectoryNode?, depth: Int, more: DirectoryLoadMoreInfo? = nil) {
+    init(node: DirectoryNode, depth: Int) {
         self.node = node
         self.depth = depth
-        self.more = more
-    }
-
-    static func more(folderID: UUID, depth: Int, remaining: Int) -> DirectoryRowItem {
-        DirectoryRowItem(node: nil, depth: depth,
-                         more: DirectoryLoadMoreInfo(folderID: folderID, depth: depth, remaining: remaining))
     }
 }
 
@@ -564,28 +524,8 @@ struct DirectoryNodeRow: View {
                 fileRow(file)
             }
         }
+        // 右键菜单由 NSTableView.menu(for:) 提供（AppKit 层），在此不再用 SwiftUI contextMenu
         .padding(.leading, CGFloat(depth) * indentStep)
-        .contextMenu {
-            contextMenuItems
-        }
-    }
-
-    /// 右键菜单：文件额外有「打开」，文件夹/文件都有「在访达中查看」「复制路径」
-    @ViewBuilder
-    private var contextMenuItems: some View {
-        if !node.isFolder, let file = node.file {
-            Button("打开") {
-                NSWorkspace.shared.open(file.url)
-            }
-            Divider()
-        }
-        Button("在访达中查看") {
-            NSWorkspace.shared.activateFileViewerSelecting([node.url])
-        }
-        Button("复制路径") {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(node.url.path, forType: .string)
-        }
     }
 
     private var folderRow: some View {

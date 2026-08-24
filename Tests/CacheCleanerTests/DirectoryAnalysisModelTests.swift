@@ -151,4 +151,37 @@ final class DirectoryAnalysisModelTests: XCTestCase {
         XCTAssertFalse(model.hasProtectedSelected)
         XCTAssertEqual(model.selectedCount, 1)
     }
+
+    // 回归：此前 cleanSelected 只删 .safeToClean，受保护(红/黄)文件即使勾选并二次强确认也删不掉，
+    // 纯选中受保护文件时还静默 return。现在受保护文件应真正可删。
+    func testCleanSelectedDeletesProtectedFile() async throws {
+        try makeFile("sub/source.swift")  // 重要(红)，默认不勾
+        try makeFile("plain.tmp")         // 可清理(绿)，默认勾上
+
+        let model = DirectoryAnalysisModel()
+        model.analyze(tempRoot)
+        await waitForScan(model)
+
+        guard let swiftFile = model.files.first(where: { $0.relativePath == "sub/source.swift" }) else {
+            XCTFail("应找到 sub/source.swift")
+            return
+        }
+        XCTAssertFalse(model.isSelected(swiftFile), "重要文件默认不勾")
+
+        // 只勾选受保护文件，验证纯受保护时也能删除（不能静默 return）
+        model.selectedIDs = [swiftFile.id]
+        model.cleanSelected(useTrash: false)
+        let deadline = Date().addingTimeInterval(5)
+        while model.isCleaning && Date() < deadline {
+            await Task.yield()
+        }
+
+        XCTAssertFalse(model.isCleaning, "清理应完成")
+        XCTAssertNil(model.files.first(where: { $0.relativePath == "sub/source.swift" }),
+                     "重要文件应被真正删除")
+        let url = tempRoot.appendingPathComponent("sub/source.swift")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path), "磁盘上文件应已删除")
+        XCTAssertNotNil(model.cleanReport, "清理应有报告，不再静默无提示")
+        XCTAssertTrue((model.cleanReport ?? "").contains("成功释放"), "报告应含成功字样")
+    }
 }

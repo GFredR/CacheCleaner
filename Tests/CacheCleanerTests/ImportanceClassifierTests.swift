@@ -7,12 +7,28 @@ final class ImportanceClassifierTests: XCTestCase {
         ImportanceClassifier.classify(url: URL(fileURLWithPath: path))
     }
 
-    // 规则 0a 里普通缓存/产物内容仍算可清理
+    // 规则 0a 里普通缓存/产物内容（扩展名属于缓存/产物表）在目录段下仍算可清理
     func testSafePathSegmentCaches() {
         XCTAssertEqual(classify("/Users/x/Library/Caches/com.tencent.x/foo.log"), .safeToClean)
         XCTAssertEqual(classify("/Users/x/Library/Caches/com.tencent.x/widget.o"), .safeToClean)
         XCTAssertEqual(classify("/Users/x/Projects/A/node_modules/react/dist/bundle.o"), .safeToClean)
-        XCTAssertEqual(classify("/Users/x/Library/Developer/Xcode/DerivedData/A/Build/Products/x"), .safeToClean)
+        // .o 属缓存产物扩展名 → 仍可清理
+        XCTAssertEqual(classify("/Users/x/Library/Developer/Xcode/DerivedData/A/Build/Products/app.o"), .safeToClean)
+    }
+
+    // 规则 0a 保守兜底：命中可清理目录段，但扩展名/文件名不是真正的缓存产物时，
+    // 一律降级为谨慎（黄，不默认勾选删除），杜绝无扩展名/压缩包/未知类型被误删。
+    func testSafePathSegmentCautiousForUnknownAndArchives() {
+        // 无扩展名的重要/业务文件
+        XCTAssertEqual(classify("/Users/x/A/tmp/论文终稿"), .cautious)
+        XCTAssertEqual(classify("/Users/x/B/Logs/财务数据"), .cautious)
+        XCTAssertEqual(classify("/Users/x/C/cache/客户名单"), .cautious)
+        // 谨慎类型（压缩包/可执行）在目录段下不得被当成可清理
+        XCTAssertEqual(classify("/Users/x/A/tmp/打包.zip"), .cautious)
+        XCTAssertEqual(classify("/Users/x/B/build/app.dmg"), .cautious)
+        // 明确缓存/日志扩展名才保持可清理
+        XCTAssertEqual(classify("/Users/x/A/tmp/foo.tmp"), .safeToClean)
+        XCTAssertEqual(classify("/Users/x/C/cache/access.log"), .safeToClean)
     }
 
     // 危险场景防护：任意业务目录里名为 tmp/cache 子文件夹下的"重要类型"文件，

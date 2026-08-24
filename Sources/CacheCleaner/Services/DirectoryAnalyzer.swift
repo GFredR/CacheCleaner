@@ -149,6 +149,8 @@ final class DirectoryAnalyzer {
                   Array(comps.prefix(rootComps.count)) == rootComps else { continue }
             return comps.suffix(comps.count - rootComps.count).joined(separator: "/")
         }
-        return file.path
+        // 前缀始终不匹配（理论上不该发生）：回退为单文件名，而非整条绝对路径，
+        // 避免把 /Users/.../xxx 也切成多层目录段，渲染出假的层级树。
+        return file.lastPathComponent
     }
 }

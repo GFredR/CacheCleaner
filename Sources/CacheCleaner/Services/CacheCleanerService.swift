@@ -127,6 +127,10 @@ enum CacheCleanerService {
             }
         }
 
+        // 目录本身为空：没有可删内容，视为"已清空"而非失败，避免误报进失败列表
+        if contents.isEmpty {
+            return RemovalOutcome(kind: .full)
+        }
         if removed == 0 {
             return RemovalOutcome(kind: .none)
         } else if removed == contents.count {

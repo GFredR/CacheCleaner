@@ -126,13 +126,14 @@ enum ImportanceClassifier {
 
         // 规则 0a：可清理目录段命中。
         // 注意：用户可让本工具分析任意目录，某业务子文件夹可能恰好叫 tmp/cache/build。
-        // 因此若命中目录段内文件扩展名/文件名属于"重要"类型，降级为谨慎（黄，不默认勾选删除），
-        // 仅对真正的缓存/产物扩展名保持可清理，避免把 index.js 外的 docx/pdf/db 等误删。
+        // 因此填入"重要/谨慎文件或未知类型一律降级为谨慎（黄，不默认勾选删除）"的保守兜底：
+        // 仅当扩展名/文件名属于真正的缓存产物（safeExtensions / safeFileNames）才算可清理，
+        // 避免把无扩展名的重要文档、zip/tar 压缩包、代码文件等误判成绿而被默认勾选删除。
         for segment in safePathSegments where path.contains(segment) {
-            if importantExtensions.contains(ext) || importantFileNames.contains(name) {
-                return .cautious
+            if safeExtensions.contains(ext) || safeFileNames.contains(nameLower) {
+                return .safeToClean
             }
-            return .safeToClean
+            return .cautious
         }
 
         // 规则 0b：.git 目录及其内容都重要

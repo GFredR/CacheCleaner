@@ -304,7 +304,8 @@ final class DirectoryAnalysisModel: ObservableObject {
     // MARK: - 清理
 
     func cleanSelected(useTrash: Bool = false) {
-        let targets = files.filter { selectedIDs.contains($0.id) && $0.level == .safeToClean }
+        // 删除所有已选文件（含勾选的重要/谨慎）。红/黄文件有单独的二次强确认，不与绿混删。
+        let targets = files.filter { selectedIDs.contains($0.id) }
         guard !targets.isEmpty else { return }
 
         // 与缓存清理页共用同一套白名单保护：命中白名单的文件即使标绿也跳过

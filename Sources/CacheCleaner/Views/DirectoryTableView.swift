@@ -8,7 +8,6 @@ private final class RowHostCell: NSTableCellView {
     let hosting = NSHostingView<AnyView>(rootView: AnyView(EmptyView()))
 
     static let rowID = NSUserInterfaceItemIdentifier("DirectoryAnalysis.Row")
-    static let moreID = NSUserInterfaceItemIdentifier("DirectoryAnalysis.LoadMore")
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -28,34 +27,6 @@ private final class RowHostCell: NSTableCellView {
 
     func configure<V: View>(_ view: V) {
         hosting.rootView = AnyView(view)
-    }
-}
-
-/// 「加载更多」行（独立占用一个 cell，便于与普通行分开复用）
-private struct LoadMoreRowView: View {
-    @AppStorage("fontSize") private var fontSize: Double = 13
-    let info: DirectoryLoadMoreInfo
-    let onLoadMore: (DirectoryLoadMoreInfo) -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Color.clear.frame(width: 14 + CGFloat(info.depth) * 16, height: 16)
-            Button {
-                onLoadMore(info)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.down.circle")
-                        .font(.system(size: fontSize - 1))
-                    Text("还有 \(info.remaining) 个文件，加载更多")
-                        .font(.system(size: fontSize - 1))
-                }
-                .foregroundStyle(Color.accentColor)
-            }
-            .buttonStyle(.plain)
-            .onAppear { onLoadMore(info) }
-            Spacer()
-        }
-        .padding(.vertical, 6)
     }
 }
 
@@ -80,7 +51,6 @@ final class DirectoryTableController: NSViewController, NSTableViewDataSource, N
     }
     var isFolderExpanded: (UUID) -> Bool = { _ in false }
     var onToggleExpand: (DirectoryNode) -> Void = { _ in }
-    var onLoadMore: (DirectoryLoadMoreInfo) -> Void = { _ in }
     var rowHeight: CGFloat = 36 {
         didSet {
             guard oldValue != rowHeight else { return }
@@ -139,6 +109,45 @@ final class DirectoryTableController: NSViewController, NSTableViewDataSource, N
         tableView.reloadData()
     }
 
+    // MARK: - 右键菜单（AppKit 层，自绘 cell 内 SwiftUI contextMenu 不可靠）
+
+    private var contextNode: DirectoryNode?
+
+    func tableView(_ tableView: NSTableView, menuFor tableColumn: NSTableColumn?, row: Int) -> NSMenu? {
+        guard dataRows.indices.contains(row) else { return nil }
+        let node = dataRows[row].node
+        contextNode = node
+        let menu = NSMenu()
+        if !node.isFolder, node.file != nil {
+            let open = NSMenuItem(title: "打开", action: #selector(menuOpenFile), keyEquivalent: "")
+            open.target = self
+            menu.addItem(open)
+            menu.addItem(.separator())
+        }
+        let reveal = NSMenuItem(title: "在访达中查看", action: #selector(menuReveal), keyEquivalent: "")
+        reveal.target = self
+        menu.addItem(reveal)
+        let copy = NSMenuItem(title: "复制路径", action: #selector(menuCopyPath), keyEquivalent: "")
+        copy.target = self
+        menu.addItem(copy)
+        return menu
+    }
+
+    @objc private func menuOpenFile() {
+        if let file = contextNode?.file { NSWorkspace.shared.open(file.url) }
+    }
+
+    @objc private func menuReveal() {
+        if let node = contextNode { NSWorkspace.shared.activateFileViewerSelecting([node.url]) }
+    }
+
+    @objc private func menuCopyPath() {
+        if let node = contextNode {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(node.url.path, forType: .string)
+        }
+    }
+
     // MARK: - DataSource / Delegate
 
     func numberOfRows(in tableView: NSTableView) -> Int {
@@ -148,18 +157,8 @@ final class DirectoryTableController: NSViewController, NSTableViewDataSource, N
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard dataRows.indices.contains(row) else { return nil }
         let item = dataRows[row]
+        let node = item.node
 
-        if let more = item.more {
-            let cell = tableView.makeView(withIdentifier: RowHostCell.moreID, owner: nil) as? RowHostCell
-                ?? makeCell(identifier: RowHostCell.moreID)
-            cell.configure(
-                LoadMoreRowView(info: more, onLoadMore: onLoadMore)
-                    .padding(.horizontal, rowHorizontalPadding)
-            )
-            return cell
-        }
-
-        guard let node = item.node else { return nil }
         let cell = tableView.makeView(withIdentifier: RowHostCell.rowID, owner: nil) as? RowHostCell
             ?? makeCell(identifier: RowHostCell.rowID)
         let rowView = DirectoryNodeRow(
@@ -195,12 +194,11 @@ final class DirectoryTableController: NSViewController, NSTableViewDataSource, N
 struct DirectoryTable: NSViewControllerRepresentable {
     let model: DirectoryAnalysisModel
     let rows: [DirectoryRowItem]
-    /// 结构唯一版本号：仅当 tree/展开/分批次变化时 +1；勾选不递增 → 不触发 reload
+    /// 结构唯一版本号：仅当 tree/展开变化时 +1；勾选不递增 → 不触发 reload
     let revision: Int
     let fontSize: Double
     let isFolderExpanded: (UUID) -> Bool
     let onToggleExpand: (DirectoryNode) -> Void
-    let onLoadMore: (DirectoryLoadMoreInfo) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -212,7 +210,6 @@ struct DirectoryTable: NSViewControllerRepresentable {
         controller.dataRows = rows
         controller.isFolderExpanded = isFolderExpanded
         controller.onToggleExpand = onToggleExpand
-        controller.onLoadMore = onLoadMore
         controller.rowHeight = Self.height(for: fontSize)
         return controller
     }
@@ -225,7 +222,6 @@ struct DirectoryTable: NSViewControllerRepresentable {
         }
         controller.isFolderExpanded = isFolderExpanded
         controller.onToggleExpand = onToggleExpand
-        controller.onLoadMore = onLoadMore
         controller.rowHeight = Self.height(for: fontSize)
     }
 
@@ -246,11 +242,8 @@ private extension Double {
 // MARK: - 可见行标识（用于轻量比较是否结构变化，避免勾选时 O(n) 重新 reload）
 
 extension DirectoryRowItem {
-    /// 稳定、便宜的指纹：区分普通行与加载更多行，并区分不同文件夹/展开层级
+    /// 稳定、便宜的指纹：区分不同节点与展开层级
     var referenceID: String {
-        if let more { return "more:\(more.folderID.uuidString):\(more.remaining)" }
-        guard let node else { return "empty" }
-        let expandedMarker = 0 // 膨胀箭头状态由更新二轮推导；此处仅需区分节点
-        return "row:\(node.id.uuidString):d\(depth):e\(expandedMarker)"
+        "row:\(node.id.uuidString):d\(depth)"
     }
 }

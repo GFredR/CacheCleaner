@@ -26,8 +26,7 @@ final class WhitelistPersistenceTests: XCTestCase {
 
     /// 验证 CacheCleanerModel.addWhitelist 完整流程（含去重）
     func testAddWhitelistAndDedup() {
-        // 隔离测试：用一个唯一 key 避免污染真实数据
-        let model = CacheCleanerModel()
+        // 用 UserDefaults 直接测核心逻辑（不直接构造 @MainActor 的 model 实例）
 
         // 用 UserDefaults 直接测：模拟 addWhitelist 的核心逻辑
         let testKey = "test_addwl_\(UUID().uuidString)"

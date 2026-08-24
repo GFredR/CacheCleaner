@@ -2,6 +2,8 @@ import Foundation
 import Combine
 
 /// 主视图模型：持有扫描/选中/清理状态
+/// @MainActor：所有 @Published 与状态变更都收口到主线程；重 IO 走 Task.detached 不触碰可达状态
+@MainActor
 final class CacheCleanerModel: ObservableObject {
 
     // MARK: - 发布状态

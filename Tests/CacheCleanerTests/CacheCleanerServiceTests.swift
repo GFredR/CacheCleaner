@@ -74,6 +74,25 @@ final class CacheCleanerServiceTests: XCTestCase {
         XCTAssertEqual(result.failedPaths, [missing.path], "不存在的目录应计入失败")
     }
 
+    // 空目录没有可删内容，应视为"已清空"而非失败，避免留在重试列表并误报失败
+    func testCleanEmptyDirNotReportedAsFailed() throws {
+        let dir = makeCacheDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let result = CacheCleanerService.clean(
+            items: [fakeItem(url: dir)],
+            toTrash: false,
+            skipRunning: false,
+            whitelist: [],
+            forceTrashForSystem: false,
+            isCancelled: { false }
+        )
+        XCTAssertEqual(result.failedPaths, [], "空目录不应计入失败")
+        XCTAssertEqual(result.freedBytes, 0)
+        // 目录本身保留
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dir.path))
+    }
+
     // MARK: - 白名单目录边界匹配
 
     func testWhitelistMatchesExactPath() {

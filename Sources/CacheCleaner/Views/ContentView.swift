@@ -264,11 +264,8 @@ struct CacheCleanerView: View {
             .disabled(model.selectedCount == 0 || model.isCleaning)
 
             Button(role: .destructive) {
-                if model.useTrash {
-                    model.cleanSelected()
-                } else {
-                    showCleanConfirm = true
-                }
+                // 无论是否进废纸篓都先确认，统一「删除前确认」口径
+                showCleanConfirm = true
             } label: {
                 Label("清理所选", systemImage: "trash")
                     .font(.system(size: fontSize))
