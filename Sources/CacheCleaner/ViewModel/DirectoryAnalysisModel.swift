@@ -66,6 +66,118 @@ final class DirectoryAnalysisModel: ObservableObject {
     var selectedSize: Int64 { _selectedSize }
     var selectedCount: Int { selectedIDs.count }
 
+    /// 当前选中的"重要/谨慎"受保护文件（默认不勾选，删除前需二次强确认）
+    var selectedProtectedFiles: [AnalyzedFile] {
+        files.filter { selectedIDs.contains($0.id) && $0.level != .safeToClean }
+    }
+
+    var hasProtectedSelected: Bool {
+        !selectedProtectedFiles.isEmpty
+    }
+
+    func isSelected(_ file: AnalyzedFile) -> Bool {
+        selectedIDs.contains(file.id)
+    }
+
+    // MARK: - 文件夹内部选中统计（折叠时也能看出勾选了哪些；支持整目录勾选）
+
+    /// nodeID -> 父 nodeID（文件节点 id=file.id，值为其所在文件夹 id）
+    private var parentChain: [UUID: UUID] = [:]
+    /// 文件夹 nodeID -> 其子树内已勾选的文件数（含重要/谨慎）
+    private var selectedCountByNode: [UUID: Int] = [:]
+    /// 文件夹 nodeID -> 其子树内已勾选的文件总大小
+    private var selectedSizeByNode: [UUID: Int64] = [:]
+    /// 文件夹 nodeID -> 其子树内文件总数（用于判断全选/部分选）
+    private var totalCountByNode: [UUID: Int] = [:]
+    /// 文件夹 nodeID -> 其子树内所有文件 id 集合（用于一键勾选整目录）
+    private var fileIDsByFolder: [UUID: Set<UUID>] = [:]
+
+    /// 文件夹内部已勾选的文件数（仅文件夹有意义）
+    func selectedFiles(in node: DirectoryNode) -> Int {
+        node.isFolder ? (selectedCountByNode[node.id] ?? 0) : 0
+    }
+
+    /// 文件夹内部文件总数（仅文件夹有意义）
+    func totalFiles(in node: DirectoryNode) -> Int {
+        node.isFolder ? (totalCountByNode[node.id] ?? 0) : 0
+    }
+
+    /// 节点勾选状态：none（未选）/ partial（部分选）/ all（全部勾选）
+    func selectionState(of node: DirectoryNode) -> DirectorySelectionState {
+        guard node.isFolder else {
+            guard let file = node.file else { return .none }
+            return selectedIDs.contains(file.id) ? .all : .none
+        }
+        let sel = selectedFiles(in: node)
+        if sel == 0 { return .none }
+        return sel >= (totalCountByNode[node.id] ?? 0) ? .all : .partial
+    }
+
+    /// 一键勾选/取消整个文件夹内的所有文件（部分选/未选 → 全选，全选 → 全不选）。
+    /// 重要/谨慎会被一并勾上，点击清理时仍会走二次强确认。
+    func toggleFolder(_ node: DirectoryNode) {
+        guard node.isFolder,
+              let ids = fileIDsByFolder[node.id],
+              !ids.isEmpty else { return }
+        if ids.isSubset(of: selectedIDs) {
+            for f in files where ids.contains(f.id) && selectedIDs.contains(f.id) {
+                selectedIDs.remove(f.id)
+                _selectedSize -= f.size
+            }
+        } else {
+            for f in files where ids.contains(f.id) && !selectedIDs.contains(f.id) {
+                selectedIDs.insert(f.id)
+                _selectedSize += f.size
+            }
+        }
+        rebuildFolderMaps()
+    }
+
+    /// 沿父链 + 文件夹统计全量重建（树重建 / 勾选集整批变化后调用）
+    private func rebuildFolderMaps() {
+        var chain: [UUID: UUID] = [:]
+        func walk(_ nodes: [DirectoryNode], parent: UUID?) {
+            for n in nodes {
+                if let p = parent { chain[n.id] = p }
+                if let c = n.children { walk(c, parent: n.id) }
+            }
+        }
+        walk(tree, parent: nil)
+        parentChain = chain
+
+        var selectedCounts: [UUID: Int] = [:]
+        var selectedSizes: [UUID: Int64] = [:]
+        var totalCounts: [UUID: Int] = [:]
+        var idSets: [UUID: Set<UUID>] = [:]
+        for f in files {
+            var cur = f.id
+            while let parent = chain[cur] {
+                totalCounts[parent, default: 0] += 1
+                idSets[parent, default: []].insert(f.id)
+                if selectedIDs.contains(f.id) {
+                    selectedCounts[parent, default: 0] += 1
+                    selectedSizes[parent, default: 0] += f.size
+                }
+                cur = parent
+            }
+        }
+        selectedCountByNode = selectedCounts
+        selectedSizeByNode = selectedSizes
+        totalCountByNode = totalCounts
+        fileIDsByFolder = idSets
+    }
+
+    /// 单个文件勾选/取消时，沿父链增量更新选中统计（O(depth)，避免整目录重建）
+    private func applySelectionDelta(_ file: AnalyzedFile, delta: Int) {
+        let sizeDelta: Int64 = delta > 0 ? file.size : -file.size
+        var cur = file.id
+        while let parent = parentChain[cur] {
+            selectedCountByNode[parent, default: 0] += delta
+            selectedSizeByNode[parent, default: 0] += sizeDelta
+            cur = parent
+        }
+    }
+
     var totalSizeString: String {
         SizeFormatter.string(from: totalSize)
     }
@@ -154,6 +266,7 @@ final class DirectoryAnalysisModel: ObservableObject {
                 let safe = self.files.filter { $0.level == .safeToClean }
                 self.selectedIDs = Set(safe.map { $0.id })
                 self._selectedSize = safe.reduce(0) { $0 + $1.size }
+                self.rebuildFolderMaps()
                 self.isScanning = false
                 self.currentPath = ""
             }
@@ -169,21 +282,23 @@ final class DirectoryAnalysisModel: ObservableObject {
     // MARK: - 选择
 
     func toggleSelection(_ file: AnalyzedFile) {
-        // 只有可清理项能勾选
-        guard file.level == .safeToClean else { return }
         if selectedIDs.contains(file.id) {
             selectedIDs.remove(file.id)
             _selectedSize -= file.size
+            applySelectionDelta(file, delta: -1)
         } else {
             selectedIDs.insert(file.id)
             _selectedSize += file.size
+            applySelectionDelta(file, delta: 1)
         }
     }
 
+    /// 全选所有可清理项（仅绿；不碰受保护的红/黄文件）
     func selectAllCleanable() {
         let all = files.filter { $0.level == .safeToClean }
         selectedIDs = Set(all.map { $0.id })
         _selectedSize = all.reduce(0) { $0 + $1.size }
+        rebuildFolderMaps()
     }
 
     // MARK: - 清理
@@ -232,6 +347,7 @@ final class DirectoryAnalysisModel: ObservableObject {
                 self.recomputeStats()
                 self.selectedIDs.removeAll()
                 self._selectedSize = 0
+                self.rebuildFolderMaps()
                 self.isCleaning = false
 
                 let freedString = SizeFormatter.string(from: result.freed)
@@ -245,4 +361,9 @@ final class DirectoryAnalysisModel: ObservableObject {
             }
         }
     }
+}
+
+/// 目录树节点的勾选状态：none（未选）/ partial（部分选）/ all（全部勾选）
+enum DirectorySelectionState {
+    case none, partial, all
 }

@@ -26,7 +26,7 @@
 
 ### 📂 目录分析
 
-| 拖拽引导 | 准备中进度 | 扫描中进度 | 树形结果（13.8 GB） |
+| 拖拽引导 | 准备中进度 | 扫描中进度 | 树形结果（深色主题 · 3.9 GB） |
 | :---: | :---: | :---: | :---: |
 | ![](screenshots/05-analysis-dropzone.png) | ![](screenshots/07-analysis-prepare-progress.png) | ![](screenshots/08-analysis-scanning-progress.png) | ![](screenshots/09-analysis-tree-results.png) |
 
@@ -58,6 +58,7 @@
 | 🛡️ **二次确认** | 清理前弹窗列出要删的项 + 预计释放 + 跳过项说明 |
 | 🌍 **i18n** | 中英文双语，系统切语言自动切换（SwiftUI LocalizedStringKey 查表） |
 | ♿ **无障碍** | 主要交互控件 `accessibilityLabel` 标注 |
+| 🌗 **主题切换** | 浅色 / 深色 / 跟随系统 3 档，macOS 13+ 即时生效（NSApp.appearance） |
 | 🧪 **测试** | 32 个单元测试覆盖白名单边界、树构建、重要性分类、扫描一致性、i18n、UserDefaults 持久化 |
 
 ---

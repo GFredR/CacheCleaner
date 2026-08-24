@@ -1,8 +1,8 @@
 import Foundation
 
 /// 目录树节点：文件夹或文件
-struct DirectoryNode: Identifiable {
-    let id = UUID()
+struct DirectoryNode: Identifiable, Equatable {
+    let id: UUID
     let url: URL
     let name: String
     /// 文件节点对应的分析结果；文件夹节点为 nil
@@ -13,6 +13,8 @@ struct DirectoryNode: Identifiable {
     var size: Int64
     /// 子树文件数（仅文件夹有意义）
     var fileCount: Int
+    /// 父节点 id（便于沿父链统计"每个文件夹内部有多少已选可清理项"）
+    let parentID: UUID?
 
     var isFolder: Bool { file == nil }
     var level: ImportanceLevel? { file?.level }
@@ -33,13 +35,14 @@ enum DirectoryTreeBuilder {
                 .map(String.init)
             return (parts, file)
         }
-        return buildLevel(entries, rootURL: rootURL)
+        return buildLevel(entries, rootURL: rootURL, parentID: nil)
     }
 
     /// 构建一层：按「剩余路径第一段」分组（目录 → 递归，文件 → 叶子），再排序
     private static func buildLevel(
         _ entries: [([String], AnalyzedFile)],
-        rootURL: URL
+        rootURL: URL,
+        parentID: UUID?
     ) -> [DirectoryNode] {
         var folderGroups: [String: [([String], AnalyzedFile)]] = [:]
         var leaves: [([String], AnalyzedFile)] = []
@@ -60,21 +63,24 @@ enum DirectoryTreeBuilder {
 
         for (name, subEntries) in folderGroups {
             let folderURL = rootURL.appendingPathComponent(name)
-            let children = buildLevel(subEntries, rootURL: folderURL)
+            // 文件夹节点本身需要开局即可用的 id，供子层作为 parentID
+            let nodeID = UUID()
+            let children = buildLevel(subEntries, rootURL: folderURL, parentID: nodeID)
             let size = children.reduce(Int64(0)) { $0 + $1.size }
             let count = children.reduce(0) { $0 + $1.fileCount }
             nodes.append(DirectoryNode(
-                url: folderURL, name: name, file: nil, children: children,
-                size: size, fileCount: count
+                id: nodeID, url: folderURL, name: name, file: nil, children: children,
+                size: size, fileCount: count, parentID: parentID
             ))
         }
 
         for entry in leaves {
             let file = entry.1
             let url = rootURL.appendingPathComponent(file.url.lastPathComponent)
+            // 文件节点 id 直接复用 file.id，便于模型层按勾选状态沿父链统计
             nodes.append(DirectoryNode(
-                url: url, name: file.url.lastPathComponent, file: file, children: nil,
-                size: file.size, fileCount: 1
+                id: file.id, url: url, name: file.url.lastPathComponent, file: file,
+                children: nil, size: file.size, fileCount: 1, parentID: parentID
             ))
         }
 

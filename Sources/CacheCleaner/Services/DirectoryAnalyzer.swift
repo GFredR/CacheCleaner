@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// 分析出的单个文件
 struct AnalyzedFile: Identifiable, Hashable {
@@ -92,8 +93,12 @@ final class DirectoryAnalyzer {
         var files: [AnalyzedFile] = []
         var processed = 0
 
+        // 枚举器返回的是符号链接解析后的真实路径（如 /var → /private/var）。
+        // 先把根目录统一成 realpath，relativePath 才能正确去掉前缀；否则整个绝对路径会变成目录段。
+        let rootURL = url.resolvingSymlinksInPath()
+
         guard let enumerator = fm.enumerator(
-            at: url,
+            at: rootURL,
             includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey],
             options: [.skipsPackageDescendants]
         ) else {
@@ -113,7 +118,7 @@ final class DirectoryAnalyzer {
             let level = ImportanceClassifier.classify(url: fileURL)
             files.append(AnalyzedFile(
                 url: fileURL,
-                relativePath: relativePath(of: fileURL, from: url),
+                relativePath: relativePath(of: fileURL, from: rootURL),
                 size: Int64(size),
                 level: level
             ))
@@ -133,12 +138,17 @@ final class DirectoryAnalyzer {
         return files
     }
 
-    /// 计算相对路径
+    /// 计算相对路径。
+    /// 枚举器可能返回符号链接已解析的真实路径（如 /var → /private/var），也可能保持原样；
+    /// 因此同时尝试未解析与已解析两种形态做前缀比对，避免绝对路径被当成目录段。
     private func relativePath(of file: URL, from root: URL) -> String {
-        let filePath = file.path
-        let rootPath = root.path
-        guard filePath.hasPrefix(rootPath) else { return filePath }
-        let rel = String(filePath.dropFirst(rootPath.count))
-        return rel.hasPrefix("/") ? String(rel.dropFirst()) : rel
+        let rootComps = root.resolvingSymlinksInPath().pathComponents
+        for path in [file.path, file.resolvingSymlinksInPath().path] {
+            let comps = URL(fileURLWithPath: path).pathComponents
+            guard comps.count >= rootComps.count,
+                  Array(comps.prefix(rootComps.count)) == rootComps else { continue }
+            return comps.suffix(comps.count - rootComps.count).joined(separator: "/")
+        }
+        return file.path
     }
 }
