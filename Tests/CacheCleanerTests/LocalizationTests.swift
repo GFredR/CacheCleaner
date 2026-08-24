@@ -36,11 +36,12 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(value, "Cache Cleanup", "英文翻译表应返回 'Cache Cleanup'")
     }
 
-    /// 验证 LocalizedStringKey 字面量推断（这是 SwiftUI 自动查表的关键）
+    /// 验证 LocalizedStringKey 字面量能查到翻译（任意系统语言下都稳定：
+    /// 中文环境返回"缓存清理"，英文环境返回"Cache Cleanup"，
+    /// 只要不是 fallback 即证明查表生效，不因 CI runner 语言环境而失败）
     func testLocalizedStringKeyFromLiteral() {
-        // 直接用 NSLocalizedString 验证 key 存在于 bundle（中文 base）
         let value = NSLocalizedString("缓存清理", bundle: Bundle.module, value: "MISS", comment: "")
-        XCTAssertNotEqual(value, "MISS", "中文 base key '缓存清理' 必须在 bundle 中可查")
-        XCTAssertEqual(value, "缓存清理", "当前 locale 应返回中文")
+        XCTAssertNotEqual(value, "MISS",
+                          "key '缓存清理' 必须在当前 locale 的 bundle 中可查（不应返回 fallback）")
     }
 }
