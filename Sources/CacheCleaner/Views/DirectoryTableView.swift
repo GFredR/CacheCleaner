@@ -32,6 +32,19 @@ private final class RowHostCell: NSTableCellView {
 
 // MARK: - 控制器
 
+/// 支持按行右键菜单的 NSTableView 子类。
+/// 说明：NSTableViewDelegate 虽有 tableView(_:menuFor:row:)，但自绘 cell 场景下
+/// 重写 NSView.menu(for:) 按坐标反查行更直接、更可靠（响应链标准机制）。
+private final class RowMenuTableView: NSTableView {
+    /// 按行号提供右键菜单；返回 nil 不弹菜单
+    var rowMenuProvider: ((Int) -> NSMenu?)?
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let point = convert(event.locationInWindow, from: nil)
+        return rowMenuProvider?(row(at: point))
+    }
+}
+
 final class DirectoryTableController: NSViewController, NSTableViewDataSource, NSTableViewDelegate {
 
     var model: DirectoryAnalysisModel? {
@@ -62,8 +75,8 @@ final class DirectoryTableController: NSViewController, NSTableViewDataSource, N
     private var rowHorizontalPadding: CGFloat { 12 }
 
     private lazy var scrollView = NSScrollView()
-    private lazy var tableView: NSTableView = {
-        let tv = NSTableView()
+    private lazy var tableView: RowMenuTableView = {
+        let tv = RowMenuTableView()
         tv.headerView = nil
         tv.style = .plain
         tv.allowsColumnReordering = false
@@ -74,6 +87,9 @@ final class DirectoryTableController: NSViewController, NSTableViewDataSource, N
         tv.intercellSpacing = NSSize(width: 0, height: 1)
         tv.rowHeight = rowHeight
         tv.usesAutomaticRowHeights = false
+        tv.rowMenuProvider = { [weak self] row in
+            self?.menuForRow(row)
+        }
 
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("DirectoryAnalysis.main"))
         tv.addTableColumn(column)
@@ -111,38 +127,42 @@ final class DirectoryTableController: NSViewController, NSTableViewDataSource, N
 
     // MARK: - 右键菜单（AppKit 层，自绘 cell 内 SwiftUI contextMenu 不可靠）
 
-    private var contextNode: DirectoryNode?
-
-    func tableView(_ tableView: NSTableView, menuFor tableColumn: NSTableColumn?, row: Int) -> NSMenu? {
+    /// 目标节点通过 NSMenuItem.representedObject 随菜单项携带，
+    /// 避免"菜单打开期间表格 reloadData 导致共享暂存节点指向错误行"的竞态。
+    private func menuForRow(_ row: Int) -> NSMenu? {
         guard dataRows.indices.contains(row) else { return nil }
         let node = dataRows[row].node
-        contextNode = node
         let menu = NSMenu()
         if !node.isFolder, node.file != nil {
-            let open = NSMenuItem(title: "打开", action: #selector(menuOpenFile), keyEquivalent: "")
-            open.target = self
-            menu.addItem(open)
+            menu.addItem(menuItem("打开", action: #selector(menuOpenFile), node: node))
             menu.addItem(.separator())
         }
-        let reveal = NSMenuItem(title: "在访达中查看", action: #selector(menuReveal), keyEquivalent: "")
-        reveal.target = self
-        menu.addItem(reveal)
-        let copy = NSMenuItem(title: "复制路径", action: #selector(menuCopyPath), keyEquivalent: "")
-        copy.target = self
-        menu.addItem(copy)
+        menu.addItem(menuItem("在访达中查看", action: #selector(menuReveal), node: node))
+        menu.addItem(menuItem("复制路径", action: #selector(menuCopyPath), node: node))
         return menu
     }
 
-    @objc private func menuOpenFile() {
-        if let file = contextNode?.file { NSWorkspace.shared.open(file.url) }
+    private func menuItem(_ title: String, action: Selector, node: DirectoryNode) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        item.representedObject = node
+        return item
     }
 
-    @objc private func menuReveal() {
-        if let node = contextNode { NSWorkspace.shared.activateFileViewerSelecting([node.url]) }
+    private func node(from sender: Any?) -> DirectoryNode? {
+        (sender as? NSMenuItem)?.representedObject as? DirectoryNode
     }
 
-    @objc private func menuCopyPath() {
-        if let node = contextNode {
+    @objc private func menuOpenFile(_ sender: NSMenuItem) {
+        if let file = node(from: sender)?.file { NSWorkspace.shared.open(file.url) }
+    }
+
+    @objc private func menuReveal(_ sender: NSMenuItem) {
+        if let node = node(from: sender) { NSWorkspace.shared.activateFileViewerSelecting([node.url]) }
+    }
+
+    @objc private func menuCopyPath(_ sender: NSMenuItem) {
+        if let node = node(from: sender) {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(node.url.path, forType: .string)
         }

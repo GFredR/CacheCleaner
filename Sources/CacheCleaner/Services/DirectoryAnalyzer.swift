@@ -78,12 +78,15 @@ final class DirectoryAnalyzer {
         isCancelled: @escaping () -> Bool = { false },
         onProgress: @escaping (Int, Int, String) -> Void
     ) async -> [AnalyzedFile] {
-        // 枚举在同步私有函数中执行（避免 Swift 6 async 上下文的 makeIterator 限制）
-        scanFiles(url: url, totalCount: totalCount, onProgress: onProgress, isCancelled: isCancelled)
+        // 与 countFiles 一致：枚举放后台执行。scanFiles 是全量同步枚举，
+        // 若直接在当前执行体（MainActor）跑会卡死 UI；进度回调由调用方自行切主线程。
+        await Task.detached(priority: .userInitiated) {
+            Self.scanFiles(url: url, totalCount: totalCount, onProgress: onProgress, isCancelled: isCancelled)
+        }.value
     }
 
     /// 同步枚举扫描（供 analyze 调用；枚举器迭代在非 async 上下文，兼容 Swift 6 严格并发）
-    private func scanFiles(
+    private static func scanFiles(
         url: URL,
         totalCount: Int,
         onProgress: @escaping (Int, Int, String) -> Void,
@@ -122,7 +125,6 @@ final class DirectoryAnalyzer {
                 size: Int64(size),
                 level: level
             ))
-
             processed += 1
             // 每 25 个文件回调一次（更平滑），或 totalCount 未知时也回调用于显示累计
             if processed % 25 == 0 || processed == totalCount {
@@ -141,7 +143,7 @@ final class DirectoryAnalyzer {
     /// 计算相对路径。
     /// 枚举器可能返回符号链接已解析的真实路径（如 /var → /private/var），也可能保持原样；
     /// 因此同时尝试未解析与已解析两种形态做前缀比对，避免绝对路径被当成目录段。
-    private func relativePath(of file: URL, from root: URL) -> String {
+    private static func relativePath(of file: URL, from root: URL) -> String {
         let rootComps = root.resolvingSymlinksInPath().pathComponents
         for path in [file.path, file.resolvingSymlinksInPath().path] {
             let comps = URL(fileURLWithPath: path).pathComponents

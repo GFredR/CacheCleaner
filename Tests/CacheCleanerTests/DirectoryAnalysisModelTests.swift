@@ -184,4 +184,57 @@ final class DirectoryAnalysisModelTests: XCTestCase {
         XCTAssertNotNil(model.cleanReport, "清理应有报告，不再静默无提示")
         XCTAssertTrue((model.cleanReport ?? "").contains("成功释放"), "报告应含成功字样")
     }
+
+    // 回归：所选文件全部命中白名单时应明确告知，而非静默返回无提示
+    func testCleanAllWhitelistedShowsReport() async throws {
+        try makeFile("a.tmp")
+        let filePath = tempRoot.appendingPathComponent("a.tmp").path
+        WhitelistStore.add(filePath)
+        defer { WhitelistStore.remove(filePath) }
+
+        let model = DirectoryAnalysisModel()
+        model.analyze(tempRoot)
+        await waitForScan(model)
+        XCTAssertEqual(model.selectedCount, 1)
+
+        model.cleanSelected(useTrash: false)
+        let deadline = Date().addingTimeInterval(5)
+        while model.isCleaning && Date() < deadline {
+            await Task.yield()
+        }
+
+        // 文件未被删除，但给出了明确的白名单提示
+        XCTAssertTrue(FileManager.default.fileExists(atPath: filePath), "白名单文件不应被删除")
+        XCTAssertNotNil(model.cleanReport, "应有清理报告，不能静默无提示")
+        XCTAssertTrue((model.cleanReport ?? "").contains("白名单"), "报告应说明命中白名单")
+    }
+
+    // 回归：删除失败（无权限等）的文件应保留勾选，方便用户直接重试
+    func testCleanKeepsFailedSelectedForRetry() async throws {
+        // 0o555 只读目录在 root 身份下不构成删除障碍，跳过避免误报
+        try XCTSkipIf(getuid() == 0, "root 身份下只读目录仍可删除，用例不适用")
+        try makeFile("sub/b.log")
+        let subDir = tempRoot.appendingPathComponent("sub")
+        let filePath = subDir.appendingPathComponent("b.log").path
+        // 父目录只读 → removeItem 无权限失败（还原权限供 tearDown 清理）
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: subDir.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: subDir.path)
+        }
+
+        let model = DirectoryAnalysisModel()
+        model.analyze(tempRoot)
+        await waitForScan(model)
+        XCTAssertEqual(model.selectedCount, 1)
+
+        model.cleanSelected(useTrash: false)
+        let deadline = Date().addingTimeInterval(5)
+        while model.isCleaning && Date() < deadline {
+            await Task.yield()
+        }
+
+        XCTAssertTrue(model.files.contains { $0.relativePath == "sub/b.log" }, "删除失败项应留在列表")
+        XCTAssertEqual(model.selectedIDs.count, 1, "失败项应保留勾选供重试")
+        XCTAssertTrue((model.cleanReport ?? "").contains("删除失败"), "报告应说明有失败项")
+    }
 }

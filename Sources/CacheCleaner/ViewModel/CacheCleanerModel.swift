@@ -250,6 +250,8 @@ final class CacheCleanerModel: ObservableObject {
     // MARK: - 清理
 
     func cleanSelected() {
+        // 防重入：清理进行中再次调用直接忽略（UI 已 disabled，此处兜底编程入口）
+        guard !isCleaning else { return }
         let toClean = items.filter { selectedIDs.contains($0.id) }
         guard !toClean.isEmpty else { return }
 

@@ -2,6 +2,8 @@ import Foundation
 import Combine
 
 /// 目录分析视图模型：持有扫描结果、勾选状态与清理逻辑
+/// @MainActor：所有 @Published 与状态变更收口到主线程；扫描/删除走 Task.detached 不阻塞 UI
+@MainActor
 final class DirectoryAnalysisModel: ObservableObject {
 
     @Published var rootURL: URL?
@@ -304,15 +306,22 @@ final class DirectoryAnalysisModel: ObservableObject {
     // MARK: - 清理
 
     func cleanSelected(useTrash: Bool = false) {
-        // 删除所有已选文件（含勾选的重要/谨慎）。红/黄文件有单独的二次强确认，不与绿混删。
+        // 防重入：清理进行中再次调用直接忽略（UI 已 disabled，此处兜底编程入口）
+        guard !isCleaning else { return }
         let targets = files.filter { selectedIDs.contains($0.id) }
         guard !targets.isEmpty else { return }
+        cleanReport = nil
 
         // 与缓存清理页共用同一套白名单保护：命中白名单的文件即使标绿也跳过
-        let whitelisted = WhitelistStore.paths()
-        let candidates = targets.filter { !CacheCleanerService.isWhitelisted($0.url, whitelist: Set(whitelisted)) }
+        // 预规范化（补 realpath 形态）：用户加的 /var/... 与扫描器记录的 /private/var/... 才能匹配上
+        let whitelist = CacheCleanerService.normalizedWhitelist(WhitelistStore.paths())
+        let candidates = targets.filter { !CacheCleanerService.isWhitelisted($0.url, whitelist: whitelist) }
         let skippedCount = targets.count - candidates.count
-        guard !candidates.isEmpty else { return }
+        // 所选文件全部命中白名单：不删除，但明确告知用户，而非静默返回
+        guard !candidates.isEmpty else {
+            cleanReport = "所选 \(targets.count) 个文件均命中白名单，未删除任何文件"
+            return
+        }
 
         isCleaning = true
         let skipped = skippedCount
@@ -346,8 +355,10 @@ final class DirectoryAnalysisModel: ObservableObject {
                 self.files = self.files.filter { !cleanedIDs.contains($0.id) }
                 self.tree = DirectoryTreeBuilder.build(from: self.files, rootURL: rootURL ?? URL(fileURLWithPath: "/"))
                 self.recomputeStats()
-                self.selectedIDs.removeAll()
-                self._selectedSize = 0
+                // 删除失败（可能被占用/无权限）的文件保留勾选，用户可直接重试而无需重新勾选
+                let failedIDs = Set(candidates.filter { result.failed.contains($0.url.path) }.map { $0.id })
+                self.selectedIDs = failedIDs
+                self._selectedSize = self.files.filter { failedIDs.contains($0.id) }.reduce(0) { $0 + $1.size }
                 self.rebuildFolderMaps()
                 self.isCleaning = false
 

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// 清理结果报告
 struct CleanResult {
@@ -34,6 +35,8 @@ enum CacheCleanerService {
         // 实时获取当前运行中的 app（避免扫描到清理之间的时间差导致误删正在使用的 App 缓存）
         let runningNow = skipRunning ? CacheScanner.runningBundleIDs() : []
         let nameTokens = skipRunning ? CacheScanner.runningAppNameTokens() : []
+        // 白名单预规范化（补 realpath 形态），避免逐条目反复 realpath
+        let whitelist = normalizedWhitelist(Array(whitelist))
 
         var freed: Int64 = 0
         var failed: [String] = []
@@ -88,10 +91,36 @@ enum CacheCleanerService {
 
     /// 白名单匹配：目录边界前缀（/Caches/WeChat 只匹配 WeChat 目录本身，不误匹配 WeChatData）
     static func isWhitelisted(_ url: URL, whitelist: Set<String>) -> Bool {
+        guard !whitelist.isEmpty else { return false }
         let path = url.path
-        return whitelist.contains { entry in
-            path == entry || path.hasPrefix(entry + "/")
+        if whitelist.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) {
+            return true
         }
+        // 同一路径可能有两种写法（/var ↔ /private/var、用户自建符号链接）。
+        // 白名单若由 normalizedWhitelist 预处理过，realpath 形态已在集合里；
+        // 这里再把文件侧规范化一次做兜底（每次调用至多 1 次 realpath）。
+        guard let realPath = Self.realpathOrNil(path) else { return false }
+        return whitelist.contains { realPath == $0 || realPath.hasPrefix($0 + "/") }
+    }
+
+    /// 把白名单每条记录补上 realpath 形态。
+    /// 调用方在逐文件过滤前调用一次，避免 isWhitelisted 内部对每条记录反复 realpath。
+    static func normalizedWhitelist(_ paths: [String]) -> Set<String> {
+        guard !paths.isEmpty else { return [] }
+        var result = Set(paths)
+        for path in paths {
+            if let real = Self.realpathOrNil(path), real != path {
+                result.insert(real)
+            }
+        }
+        return result
+    }
+
+    /// realpath 规范化：返回路径的真实形态；路径不存在时返回 nil
+    private static func realpathOrNil(_ path: String) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+        guard path.withCString({ Darwin.realpath($0, &buffer) }) != nil else { return nil }
+        return String(cString: buffer)
     }
 
     // MARK: - 删除结果
