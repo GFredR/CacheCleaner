@@ -12,7 +12,8 @@ enum CacheCategory: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .system: return "gearshape.2"
-        case .application: return "app"
+        // 用 folder 而非 app：app 是圆角空心方框，与未勾选的复选框 square 无法区分
+        case .application: return "folder"
         case .sandbox: return "shippingbox"
         case .developer: return "hammer"
         }
