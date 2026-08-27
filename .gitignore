@@ -4,6 +4,9 @@
 DerivedData/
 
 # 打包产物（build-app.sh / make-dmg.sh 生成）
+# 规范：产物必须在「包根之外」的同级目录（默认本仓库同级的 CacheCleaner-dist/），
+# 严禁落进包根——否则 Xcode 打开 SwiftPM 包时会把 .app/.dmg 当源文件无限扫描、项目卡 Loading。
+CacheCleaner-dist/            # 默认包外输出目录（Sibling，默认越界到 ../CacheCleaner-dist，此处兜底）
 CacheCleaner.app/
 CacheCleaner-*.dmg
 *.dSYM

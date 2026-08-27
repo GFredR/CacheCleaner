@@ -1,15 +1,21 @@
 #!/bin/bash
 # 把 CacheCleaner.app 打成 .dmg 安装包，含背景图、图标布局
-# 用法: ./make-dmg.sh   输出 CacheCleaner-<version>.dmg
+# 用法: ./make-dmg.sh   输出 CacheCleaner-<version>.dmg（在包外同级 CacheCleaner-dist/）
 set -e
 
 cd "$(dirname "$0")"
 
+# 与 build-app.sh 同规：所有产物进「包根之外」的同级 CacheCleaner-dist/，
+# 绝不让 .app/.dmg/dmg-staging 落到包根，避免 Xcode 打开包时被卡死。
+ROOT_DIR="$(pwd)"
+DIST_DIR="${DIST_DIR:-${ROOT_DIR}-dist}"
+mkdir -p "$DIST_DIR"
+
 APP_NAME="CacheCleaner"
 VERSION="1.1"
 DMG_NAME="${APP_NAME}-${VERSION}.dmg"
-APP_DIR="${APP_NAME}.app"
-DMG_STAGING="dmg-staging"
+APP_DIR="$DIST_DIR/$APP_NAME.app"
+DMG_STAGING="$DIST_DIR/dmg-staging"
 BG_PNG="Resources/dmg-background.png"
 APP_ICON="Resources/AppIcon.png"
 
@@ -36,7 +42,7 @@ cp "$BG_PNG" "$DMG_STAGING/.background/background.png"
 
 # 4. 生成临时 dmg 并设置 Finder 窗口布局
 echo "→ 生成临时 dmg 设置布局"
-TEMP_DMG="temp-${DMG_NAME}"
+TEMP_DMG="$DIST_DIR/temp-${DMG_NAME}"
 rm -f "$TEMP_DMG"
 hdiutil create -ov -format UDZO -srcfolder "$DMG_STAGING" \
     -volname "$APP_NAME" -fs HFS+ \
@@ -79,15 +85,15 @@ fi
 
 # 5. 转为压缩的最终 dmg
 echo "→ 压缩为最终 dmg"
-rm -f "$DMG_NAME"
-hdiutil convert "$TEMP_DMG" -format UDZO -o "$DMG_NAME" > /dev/null
+rm -f "$DIST_DIR/$DMG_NAME"
+hdiutil convert "$TEMP_DMG" -format UDZO -o "$DIST_DIR/$DMG_NAME" > /dev/null
 rm -f "$TEMP_DMG"
 
 # 6. 清理 staging
 rm -rf "$DMG_STAGING"
 
-DMG_SIZE=$(du -h "$DMG_NAME" | awk '{print $1}')
+DMG_SIZE=$(du -h "$DIST_DIR/$DMG_NAME" | awk '{print $1}')
 echo ""
-echo "✓ 生成 $DMG_NAME ($DMG_SIZE)"
-echo "  → open $DMG_NAME     # 打开查看"
+echo "✓ 生成 $DIST_DIR/$DMG_NAME ($DMG_SIZE)"
+echo "  → open $DIST_DIR/$DMG_NAME   # 打开查看"
 echo "  → 安装：把 CacheCleaner.app 拖到 Applications"

@@ -1,7 +1,15 @@
 #!/bin/bash
 # 把 SPM 构建产物打成 macOS .app bundle（含 AppIcon + Info.plist）
-# 用法: ./build-app.sh   生成的 CacheCleaner.app 在当前目录
+# 用法: ./build-app.sh   生成的 CacheCleaner.app 在包外同级 CacheCleaner-dist/
 set -e
+
+# 产物一律输出到「包根之外」的同级目录，绝不落进 SwiftPM 包根。
+# 原因：Xcode 打开包时会按磁盘目录遍历包根，若根目录存在 .app/.dmg/dmg-staging
+# 等成品产物，会造成 IDESwiftPackageFileDataTypeDetector 无限扫描、项目永远卡 Loading。
+# 默认输出到本仓库同级的 CacheCleaner-dist/；可用 DIST_DIR 环境变量覆盖。
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DIST_DIR="${DIST_DIR:-${ROOT_DIR}-dist}"
+mkdir -p "$DIST_DIR"
 
 APP_NAME="CacheCleaner"
 BUNDLE_ID="com.guofengrui.cachecleaner"
@@ -12,7 +20,7 @@ BUILD_DIR=".build/apple/Products/Release"
 if [ ! -f "$BUILD_DIR/$APP_NAME" ]; then
     BUILD_DIR=".build/release"
 fi
-APP_DIR="$APP_NAME.app"
+APP_DIR="$DIST_DIR/$APP_NAME.app"
 CONTENTS="$APP_DIR/Contents"
 ICON_PNG="Resources/AppIcon.png"
 
