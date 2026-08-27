@@ -1,14 +1,18 @@
 import SwiftUI
 import AppKit
 
-/// 主窗口：双 Tab（缓存清理 / 目录分析）
+/// 主窗口：四个 Tab（缓存清理 / 空间洞察 / 目录分析 / 清理历史）
 struct ContentView: View {
     var body: some View {
         TabView {
             CacheCleanerView()
                 .tabItem { Label("缓存清理", systemImage: "trash") }
+            SpaceInsightView()
+                .tabItem { Label("空间洞察", systemImage: "chart.bar.xaxis") }
             DirectoryAnalysisView()
                 .tabItem { Label("目录分析", systemImage: "folder.badge.gearshape") }
+            CleanHistoryView()
+                .tabItem { Label("清理历史", systemImage: "clock.arrow.circlepath") }
         }
     }
 }
@@ -20,6 +24,7 @@ struct CacheCleanerView: View {
     @State private var showCleanConfirm = false
     @State private var showPermissionAlert = false
     @State private var showSettings = false
+    @State private var showEmptyTrashConfirm = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,6 +44,7 @@ struct CacheCleanerView: View {
             if model.permissionState == .unknown {
                 model.checkPermission()
             }
+            model.refreshTrashSize()
         }
         .alert("确认清理", isPresented: $showCleanConfirm) {
             Button("取消", role: .cancel) {}
@@ -47,9 +53,18 @@ struct CacheCleanerView: View {
             Text(confirmMessage)
         }
         .alert("清理完成", isPresented: reportPresented) {
+            if model.cleanReport?.canRetry == true {
+                Button("重试未完成项（\(model.selectedCount) 项）") { model.cleanSelected() }
+            }
             Button("好", role: .cancel) {}
         } message: {
             Text(model.cleanReport?.details ?? "")
+        }
+        .alert("清空废纸篓", isPresented: $showEmptyTrashConfirm) {
+            Button("取消", role: .cancel) {}
+            Button("清空", role: .destructive) { model.emptyTrash() }
+        } message: {
+            Text("将永久删除废纸篓中的 \(model.trashSizeString) 内容，此操作不可撤销。")
         }
         .alert("需要完全磁盘访问权限", isPresented: $showPermissionAlert) {
             Button("打开系统设置") {
@@ -215,17 +230,83 @@ struct CacheCleanerView: View {
             }
             .frame(maxWidth: .infinity)
         } else {
-            List {
-                ForEach(model.items) { item in
-                    CacheRowView(
-                        item: item,
-                        isSelected: model.selectedIDs.contains(item.id),
-                        onToggle: { model.toggleSelection(item) }
-                    )
+            VStack(spacing: 0) {
+                HStack {
+                    Picker("展示方式", selection: $model.displayMode) {
+                        ForEach(CacheCleanerModel.CacheDisplayMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(maxWidth: 220)
+                    Spacer()
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                if model.isCleaning {
+                    VStack(spacing: 6) {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("正在清理 \(min(model.cleanDone + 1, model.cleanTotal))/\(model.cleanTotal)")
+                                .font(.system(size: fontSize - 1))
+                                .monospacedDigit()
+                            Text(model.cleanCurrentName)
+                                .font(.system(size: fontSize - 1))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                            Button(model.isCancellingClean ? "停止中…" : "停止") {
+                                model.cancelClean()
+                            }
+                            .font(.system(size: fontSize - 1))
+                            .disabled(model.isCancellingClean)
+                        }
+                        ProgressView(value: model.cleanProgress)
+                            .progressViewStyle(.linear)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.accentColor.opacity(0.08))
+                }
+                Divider()
+                listForMode
+                    .disabled(model.isCleaning)
             }
-            .listStyle(.inset)
         }
+    }
+
+    @ViewBuilder
+    private var listForMode: some View {
+        if model.displayMode == .directory {
+            directoryList
+        } else {
+            appGroupList
+        }
+    }
+
+    private var directoryList: some View {
+        List {
+            ForEach(model.items) { item in
+                CacheRowView(
+                    item: item,
+                    model: model,
+                    onToggle: { model.toggleSelection(item) }
+                )
+            }
+        }
+        .listStyle(.inset)
+    }
+
+    private var appGroupList: some View {
+        List {
+            ForEach(model.appGroups) { group in
+                AppGroupRowView(group: group, model: model, fontSize: fontSize)
+            }
+        }
+        .listStyle(.inset)
     }
 
     // MARK: - 底部
@@ -239,6 +320,27 @@ struct CacheCleanerView: View {
                 Label("将移入废纸篓", systemImage: "trash")
                     .font(.system(size: fontSize - 1))
                     .foregroundStyle(.secondary)
+            }
+            if model.trashSize > 0 || model.isEmptingTrash {
+                HStack(spacing: 6) {
+                    if model.isEmptingTrash {
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text("正在清空废纸篓…")
+                            .font(.system(size: fontSize - 1))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Label("废纸篓 \(model.trashSizeString)", systemImage: "trash")
+                            .font(.system(size: fontSize - 1))
+                            .foregroundStyle(.secondary)
+                            .help("清空后不可恢复")
+                        Button("清空") {
+                            showEmptyTrashConfirm = true
+                        }
+                        .font(.system(size: fontSize - 1))
+                        .disabled(model.isCleaning)
+                    }
+                }
             }
             Spacer()
             Menu {
