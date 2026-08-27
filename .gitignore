@@ -7,6 +7,7 @@ DerivedData/
 CacheCleaner.app/
 CacheCleaner-*.dmg
 *.dSYM
+dmg-staging/
 
 # dmg 安装器背景图（make-dmg.sh 首次运行时自动生成）
 Resources/dmg-background.png
