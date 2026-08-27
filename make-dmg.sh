@@ -6,7 +6,7 @@ set -e
 cd "$(dirname "$0")"
 
 APP_NAME="CacheCleaner"
-VERSION="1.0"
+VERSION="1.1"
 DMG_NAME="${APP_NAME}-${VERSION}.dmg"
 APP_DIR="${APP_NAME}.app"
 DMG_STAGING="dmg-staging"

@@ -20,3 +20,9 @@ Resources/dmg-background.png
 xcuserdata/
 *.xccheckout
 *.xcscmblueprint
+
+# 技术文章 / 讲解类文档（个人产出，不入库）
+docs/NSTableView重写实录/
+docs/article-assets/
+docs/缓存清理原理讲解.md
+docs/问题修复记录.md

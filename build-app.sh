@@ -5,7 +5,7 @@ set -e
 
 APP_NAME="CacheCleaner"
 BUNDLE_ID="com.guofengrui.cachecleaner"
-VERSION="1.0"
+VERSION="1.1"
 # 优先 Universal 2（arm64 + x86_64）产物：Intel 与 Apple Silicon 都能原生跑
 # 失败时回退单架构产物
 BUILD_DIR=".build/apple/Products/Release"
@@ -86,7 +86,7 @@ cat > "$CONTENTS/Info.plist" <<EOF
   <key>CFBundleShortVersionString</key>
   <string>$VERSION</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>2</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
   <key>NSHighResolutionCapable</key>
