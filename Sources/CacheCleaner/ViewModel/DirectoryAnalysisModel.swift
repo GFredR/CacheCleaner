@@ -370,6 +370,18 @@ final class DirectoryAnalysisModel: ObservableObject {
                     report += "；\(skipped) 个文件命中白名单已跳过"
                 }
                 self.cleanReport = report
+
+                // 写入清理历史（成功释放了才算一条）
+                if result.freed > 0 {
+                    CleanHistoryStore.add(CleanHistoryEntry(
+                        source: .directoryAnalysis,
+                        useTrash: useTrash,
+                        freedBytes: result.freed,
+                        deletedCount: candidates.count - result.failed.count,
+                        failedCount: result.failed.count,
+                        skippedCount: skipped
+                    ))
+                }
             }
         }
     }
