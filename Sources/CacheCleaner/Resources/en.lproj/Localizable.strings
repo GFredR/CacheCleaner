@@ -115,3 +115,61 @@
 "缓存分类·应用" = "Application";
 "缓存分类·沙盒" = "Sandbox";
 "缓存分类·开发" = "Developer";
+
+/*  ===== v1.1 additions =====  */
+
+/*  Tab names · v1.1  */
+"空间洞察" = "Space Insight";
+"清理历史" = "History";
+
+/*  Space insight page  */
+"选择一个目录，查看其中的大文件和重复文件" = "Pick a directory to see its largest and duplicate files";
+"正在检查：%@ · 已扫描 %lld 个文件" = "Analyzing: %@ · %lld files scanned";
+"选择目录" = "Choose Directory";
+"还没有选择目录" = "No directory selected yet";
+"点击上方「选择目录」，工具会只读分析其中的最大文件与重复文件" = "Click \"Choose Directory\" above; the tool read-only analyzes largest and duplicate files inside";
+"最大文件" = "Largest Files";
+"重复文件" = "Duplicates";
+"没有发现大文件" = "No large files found";
+"没有发现重复文件" = "No duplicates found";
+"正在扫描 %lld 个文件…" = "Scanning %lld files…";
+"发现 %lld 组重复文件，共可释放 %@" = "Found %lld duplicate groups, up to %@ reclaimable";
+"%lld 份相同 · 单份 %@ · 可释放 %@" = "%lld identical · %@ each · %@ reclaimable";
+
+/*  Clean history page  */
+"共 %lld 条 · 累计释放 %@" = "%lld entries · %@ freed in total";
+"清空历史" = "Clear History";
+"清空清理历史" = "Clear Cleanup History";
+"将删除全部清理历史记录，此操作不可撤销。" = "All cleanup history will be deleted. This cannot be undone.";
+"还没有清理记录" = "No cleanup records yet";
+"在「缓存清理」或「目录分析」里清理过一次后，这里会显示本次效果" = "Clean once in \"Cache Cleanup\" or \"Directory Analysis\" and the result will show here";
+"删除 %lld 项" = "%lld deleted";
+"%lld 项失败" = "%lld failed";
+"%lld 项跳过" = "%lld skipped";
+"已全部清理完成" = "All cleaned up";
+
+/*  Cleanup progress · v1.1  */
+"正在清理 %lld/%lld" = "Cleaning %lld/%lld";
+"停止" = "Stop";
+"停止中…" = "Stopping…";
+"重试未完成项（%lld 项）" = "Retry unfinished (%lld)";
+"权限不足" = "Permission denied";
+"文件被占用" = "File in use";
+"其他错误" = "Other errors";
+"废纸篓" = "Trash";
+"正在清空废纸篓…" = "Emptying Trash…";
+"清空废纸篓" = "Empty Trash";
+"将永久删除废纸篓中的 %@ 内容，此操作不可撤销。" = "This permanently deletes %@ in the Trash and cannot be undone.";
+"清空" = "Empty";
+"清空后不可恢复" = "Cannot be recovered once emptied";
+
+/*  Whitelist context menu · v1.1  */
+"加入白名单（永不清理）" = "Add to Whitelist (never clean)";
+"移出白名单" = "Remove from Whitelist";
+"勾选/取消整组" = "Toggle whole group";
+"勾选整组 %@" = "Toggle group %@";
+
+/*  Display mode · v1.1  */
+"展示方式" = "View by";
+"按目录" = "By Directory";
+"按应用" = "By App";
