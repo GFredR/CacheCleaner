@@ -76,8 +76,10 @@ final class SpaceInsightModel: ObservableObject {
         guard mode != newMode else { return }
         mode = newMode
         // 尚未扫描过当前模式时启动；已扫过直接展示缓存的结论
+        // 注意：扫描中切换也直接取消旧扫描重开，否则新模式永远空列表
         let hasData = newMode == .largest ? !largestFiles.isEmpty : !duplicateGroups.isEmpty
-        if !hasData && rootURL != nil && !isScanning {
+        if !hasData && rootURL != nil {
+            cancelScan()
             startScan()
         }
     }
