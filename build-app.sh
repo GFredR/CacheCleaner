@@ -44,14 +44,37 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 
 cp "$BUILD_DIR/$APP_NAME" "$CONTENTS/MacOS/"
 
-# 把语言资源（zh-Hans.lproj / en.lproj）从 SPM bundle 复制进 .app bundle
-# SPM 把 resources 规范化放在 .build/release/<Module>_<Target>.bundle/，目录名小写
-SPM_BUNDLE="$BUILD_DIR/${APP_NAME}_${APP_NAME}.bundle"
-for LOC in zh-hans en; do
-    if [ -d "$SPM_BUNDLE/$LOC.lproj" ]; then
-        cp -R "$SPM_BUNDLE/$LOC.lproj" "$CONTENTS/Resources/"
-    fi
-done
+# 把语言资源（*.lproj）从 SPM bundle 复制进 .app bundle
+# ⚠️ SPM 有两种产物结构，且 lproj 目录名大小写不一致：
+#   .build/apple/.../CacheCleaner_CacheCleaner.bundle/Contents/Resources/zh-Hans.lproj  ← Universal 2，macOS bundle 结构
+#   .build/<arch>/release/CacheCleaner_CacheCleaner.bundle/zh-hans.lproj                 ← 单架构，平铺结构
+# 原实现只按「平铺 + 小写 zh-hans」去找，`if [ -d ]` 判假后**静默跳过**，于是发布出去的
+# App 里没有任何语言资源，i18n 宣称静默失效。两种结构都试，且找不到就 fail hard——
+# i18n 是对外宣称的功能，丢了必须在构建期炸掉，不能等到发布后才发现。
+FOUND_LOC=0
+copy_lproj_from() {
+    local src="$1"
+    [ -d "$src" ] || return 0
+    local d
+    for d in "$src"/*.lproj; do
+        [ -d "$d" ] || continue
+        cp -R "$d" "$CONTENTS/Resources/"
+        FOUND_LOC=$((FOUND_LOC + 1))
+    done
+}
+copy_lproj_from "$BUILD_DIR/${APP_NAME}_${APP_NAME}.bundle/Contents/Resources"
+if [ "$FOUND_LOC" -eq 0 ]; then
+    copy_lproj_from "$BUILD_DIR/${APP_NAME}_${APP_NAME}.bundle"
+fi
+if [ "$FOUND_LOC" -eq 0 ]; then
+    copy_lproj_from ".build/x86_64-apple-macosx/release/${APP_NAME}_${APP_NAME}.bundle"
+fi
+if [ "$FOUND_LOC" -eq 0 ]; then
+    echo "✗ 错误：SPM 产物里找不到任何 .lproj 语言资源，打包会静默丢失 i18n。" >&2
+    echo "  排查：find .build -maxdepth 6 -name '*.lproj' -type d" >&2
+    exit 1
+fi
+echo "✓ 已复制 $FOUND_LOC 个 .lproj 语言资源"
 
 # 生成多尺寸 PNG + .icns
 ICONSET="$CONTENTS/Resources/AppIcon.iconset"
