@@ -12,7 +12,7 @@ DIST_DIR="${DIST_DIR:-${ROOT_DIR}-dist}"
 mkdir -p "$DIST_DIR"
 
 APP_NAME="CacheCleaner"
-VERSION="1.1"
+VERSION="1.1.1"
 DMG_NAME="${APP_NAME}-${VERSION}.dmg"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
 DMG_STAGING="$DIST_DIR/dmg-staging"

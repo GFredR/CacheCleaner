@@ -194,7 +194,10 @@ final class CacheCleanerModel: ObservableObject {
 
     init() {
         skipRunningApps = UserDefaults.standard.object(forKey: "skipRunningApps") as? Bool ?? true
-        useTrash = UserDefaults.standard.object(forKey: "useTrash") as? Bool ?? false
+        // 「移入废纸篓」默认开启：清理量通常几 GB，移入废纸篓慢一点完全可接受，
+        // 而「删错了找不回来」是不可逆的损失。v1.1 及更早默认关闭，
+        // 现在只影响没手动设过这个开关的用户 —— 手动设过的保持自己的选择。
+        useTrash = UserDefaults.standard.object(forKey: "useTrash") as? Bool ?? true
         forceTrashForSystem = UserDefaults.standard.object(forKey: "forceTrashForSystem") as? Bool ?? true
         displayMode = .directory
         if let raw = UserDefaults.standard.string(forKey: "cacheDisplayMode"),
