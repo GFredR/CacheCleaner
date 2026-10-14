@@ -335,6 +335,7 @@ CacheCleaner/
 - [行为准则](CODE_OF_CONDUCT.md)
 - [参与贡献](CONTRIBUTING.md)
 - [无障碍支持](ACCESSIBILITY.md)
+- [安全策略](SECURITY.md)
 
 ## 🙏 致谢
 
