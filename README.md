@@ -87,7 +87,7 @@
 | 🌍 **i18n** | 中英文双语，系统切语言自动切换（SwiftUI LocalizedStringKey 查表） |
 | ♿ **无障碍** | 主要交互控件 `accessibilityLabel` 标注 |
 | 🌗 **主题切换** | 浅色 / 深色 / 跟随系统 3 档，macOS 13+ 即时生效（NSApp.appearance） |
-| 🧪 **测试** | 72 个单元测试覆盖白名单边界、树构建、重要性分类、按应用聚合、大文件/重复文件扫描、清理历史、i18n、UserDefaults 持久化 |
+| 🧪 **测试** | 75 个单元测试覆盖白名单边界、树构建、重要性分类、按应用聚合、大文件/重复文件扫描、清理历史、i18n、UserDefaults 持久化，以及三个安全开关的默认值 |
 
 ---
 
@@ -181,7 +181,7 @@ open CacheCleaner.app
 # 编译
 swift build
 
-# 跑测试（72 个用例）
+# 跑测试（75 个用例）
 swift test
 
 # 打 .app
@@ -207,7 +207,7 @@ CacheCleaner/
 │   ├── dmg-background.png                 # DMG 安装包背景
 │   ├── zh-Hans.lproj/                     # 中文翻译
 │   └── en.lproj/                          # 英文翻译
-├── Tests/CacheCleanerTests/               # 72 个单元测试
+├── Tests/CacheCleanerTests/               # 75 个单元测试
 ├── screenshots/                            # README 配图
 ├── docs/CODE_REVIEW.md                    # 全项目代码审查报告
 ├── build-app.sh / make-dmg.sh             # 打包脚本
@@ -245,6 +245,8 @@ CacheCleaner/
   现在改成 `object(forKey:) ?? true`：默认安全 > 默认快。清理量通常几 GB，
   移入废纸篓慢一点完全可接受，而「删错了找不回来」是不可逆的损失。
   **只影响没手动设过这个开关的用户** —— 手动设过的保持自己的选择。
+
+**其他**：新增 3 条回归测试（72 → 75），钉住三个安全开关的默认值；已反向验证——改回 `false` 会报红。
 
 ### v1.1（2026-08）
 
@@ -328,9 +330,13 @@ CacheCleaner/
 
 ---
 
-## 🙏 致谢
+## 社区
 
-- 苹果 SF Symbols 提供的免费图标（垃圾桶/盾牌/扫描/星星等）
+- [行为准则](CODE_OF_CONDUCT.md)
+- [参与贡献](CONTRIBUTING.md)
+- [无障碍支持](ACCESSIBILITY.md)
+
+## 🙏 致谢
 
 - 苹果 SF Symbols 提供的免费图标（垃圾桶/盾牌/扫描/星星等）
 - 项目启动时参考了 [CleanMyMac](https://macpaw.com/cleanmymac) 的 UX 思路
